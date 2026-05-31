@@ -43,17 +43,20 @@ func SlashArgItems(line string, d ArgData) ([]SlashItem, int) {
 	from := strings.LastIndexAny(line, " \t") + 1
 	cur := line[from:]
 	prior := strings.Fields(line[:from]) // committed tokens, including the command word
+	var raw []SlashItem
 	switch line[:cmdEnd] {
 	case "/mcp":
-		return filterSlash(mcpArgItems(prior, cur, d), cur), from
+		raw = mcpArgItems(prior, cur, d)
 	case "/model":
-		return filterSlash(modelArgItems(prior, d), cur), from
+		raw = modelArgItems(prior, d)
 	case "/skill", "/skills":
-		return filterSlash(skillArgItems(prior, d), cur), from
+		raw = skillArgItems(prior, d)
 	case "/hooks":
-		return filterSlash(hooksArgItems(prior), cur), from
+		raw = hooksArgItems(prior)
+	default:
+		return nil, from
 	}
-	return nil, from
+	return filterSlash(raw, line, from, cur), from
 }
 
 func mcpArgItems(prior []string, cur string, d ArgData) []SlashItem {
@@ -131,14 +134,23 @@ func hooksArgItems(prior []string) []SlashItem {
 	return nil
 }
 
-// filterSlash keeps items whose label starts with prefix (case-insensitive).
-func filterSlash(items []SlashItem, prefix string) []SlashItem {
-	lp := strings.ToLower(prefix)
+// filterSlash keeps items whose label starts with the typed token (case-
+// insensitive) and drops no-op suggestions — ones whose insert wouldn't change
+// the line because the token is already fully typed (e.g. "/skill list" offering
+// "list"). Without this the menu lingers on a complete command and Enter keeps
+// "accepting" the no-op instead of sending.
+func filterSlash(items []SlashItem, line string, from int, cur string) []SlashItem {
+	lp := strings.ToLower(cur)
+	prefix := line[:from]
 	var out []SlashItem
 	for _, it := range items {
-		if strings.HasPrefix(strings.ToLower(it.Label), lp) {
-			out = append(out, it)
+		if !strings.HasPrefix(strings.ToLower(it.Label), lp) {
+			continue
 		}
+		if prefix+it.Insert == line {
+			continue // token already complete: nothing to add
+		}
+		out = append(out, it)
 	}
 	return out
 }

@@ -75,4 +75,13 @@ func TestSlashArgItems(t *testing.T) {
 	if items, _ := SlashArgItems("/help ", data); len(items) != 0 {
 		t.Errorf("/help should have no arg items; got %v", labelsOf(items))
 	}
+	// a fully-typed terminal subcommand offers nothing (no lingering no-op) so the
+	// caller can submit instead of "accepting" a no-op — the /skill list bug.
+	if items, _ := SlashArgItems("/skill list", data); len(items) != 0 {
+		t.Errorf("/skill list (token complete) should offer no suggestion; got %v", labelsOf(items))
+	}
+	// but a partial token still completes.
+	if items, _ := SlashArgItems("/skill li", data); !has(items, "list") {
+		t.Errorf("/skill li should still complete to list; got %v", labelsOf(items))
+	}
 }
