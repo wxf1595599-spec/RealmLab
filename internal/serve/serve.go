@@ -276,95 +276,10 @@ func (s *Server) RunGraceful(ctx context.Context, addr string) error {
 	}
 }
 
-// i18nTranslations returns translation maps for the serve UI.
-// Keys match those in the JS __T object (index.html).
-func i18nTranslations() map[string]map[string]string {
-	return map[string]map[string]string{
-		"en": {
-			"new_session": "New Session",
-			"compact":     "Compact",
-			"rewind":      "Rewind",
-			"branches":    "Branches",
-			"sessions":    "Sessions",
-			"loading":     "Loading...",
-			"status":      "Status",
-			"cache":       "Cache",
-			"cost":        "Cost",
-			"balance":     "Balance",
-			"ready":       "Ready",
-			"thinking":    "Thinking...",
-			"stats":       "Stats",
-			"statistics":  "Statistics",
-			"model":       "Model",
-			"total_tokens": "Total Tokens",
-			"cache_hit_rate": "Cache Hit Rate",
-			"total_cost":  "Total Cost",
-			"context_usage": "Context Usage",
-			"auto":       "Auto",
-			"plan":       "Plan",
-			"yolo":       "YOLO",
-			"approval_title": "Approval Required",
-			"delete_confirm": "Delete this session?",
-			"cancel":     "Cancel (Esc)",
-			"example_explain": "Explain the project structure",
-			"example_fix": "Find and fix any bugs",
-			"example_test": "Write tests for the main module",
-			"hint_commands": "/ commands",
-			"hint_mode": "Shift+Tab mode",
-			"hint_rewind": "Esc×2 rewind",
-			"placeholder": "Message Reasonix...  / for commands",
-			"plan_mode":  "Plan mode (read-only)",
-			"send":       "Send (Enter)",
-			"welcome_tag": "AI coding agent",
-			"yolo_mode":  "YOLO mode (auto-approve)",
-		},
-		"zh": {
-			"new_session": "新会话",
-			"compact":     "压缩",
-			"rewind":      "回退",
-			"branches":    "分支",
-			"sessions":    "会话",
-			"loading":     "加载中...",
-			"status":      "状态",
-			"cache":       "缓存",
-			"cost":        "费用",
-			"balance":     "余额",
-			"ready":       "就绪",
-			"thinking":    "思考中...",
-			"stats":       "统计",
-			"statistics":  "统计",
-			"model":       "模型",
-			"total_tokens": "总 Token",
-			"cache_hit_rate": "缓存命中率",
-			"total_cost":  "总费用",
-			"context_usage": "上下文用量",
-			"auto_mode":  "自动模式",
-			"auto":       "自动",
-			"plan":       "计划",
-			"yolo":       "YOLO",
-			"approval_title": "需要批准",
-			"delete_confirm": "删除此会话？",
-			"cancel":     "取消 (Esc)",
-			"example_explain": "解释项目结构",
-			"example_fix": "查找并修复错误",
-			"example_test": "为主模块编写测试",
-			"hint_commands": "/ 命令",
-			"hint_mode": "Shift+Tab 模式",
-			"hint_rewind": "Esc×2 回退",
-			"placeholder": "给 Reasonix 发消息...  / 查看命令",
-			"plan_mode":  "计划模式（只读）",
-			"send":       "发送 (Enter)",
-			"welcome_tag": "AI 编码助手",
-			"yolo_mode":  "YOLO 模式（自动批准）",
-		},
-	}
-}
-
 func (s *Server) index(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Ensure legacy config is migrated before reading language setting
-	config.MigrateLegacyIfNeeded()
-	lang := "en"
+	_, _ = config.MigrateLegacyIfNeeded()
+	lang := "auto"
 	if cfg, err := config.Load(); err == nil {
 		if dl := cfg.DesktopLanguage(); dl != "" {
 			lang = dl
@@ -372,42 +287,6 @@ func (s *Server) index(w http.ResponseWriter, _ *http.Request) {
 	}
 	html := string(indexHTML)
 	html = strings.ReplaceAll(html, "__LANG__", lang)
-	// Server-side i18n: replace __('key') in static HTML text nodes ONLY.
-	// JS __() handles dynamic content; must NOT touch <script> content
-	// to avoid breaking JavaScript syntax (e.g. __('thinking') → 思考中... without quotes).
-	i18nMap := i18nTranslations()
-	if trans, ok := i18nMap[lang]; ok {
-		// Split on <script, replace only in non-script segments
-		var buf strings.Builder
-		for {
-			idx := strings.Index(html, "<script")
-			if idx < 0 {
-				// No more script tags, replace in remaining content
-				s := html
-				for key, val := range trans {
-					s = strings.ReplaceAll(s, "__('"+key+"')", val)
-				}
-				buf.WriteString(s)
-				break
-			}
-			// Replace in content before <script
-			s := html[:idx]
-			for key, val := range trans {
-				s = strings.ReplaceAll(s, "__('"+key+"')", val)
-			}
-			buf.WriteString(s)
-			// Find </script> and keep script content verbatim
-			closing := strings.Index(html[idx:], "</script>")
-			if closing < 0 {
-				buf.WriteString(html[idx:])
-				break
-			}
-			closing += idx + len("</script>")
-			buf.WriteString(html[idx:closing])
-			html = html[closing:]
-		}
-		html = buf.String()
-	}
 	_, _ = w.Write([]byte(html))
 }
 
@@ -961,31 +840,50 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out)
 }
 
-// deleteSession removes a session file by path.
+// deleteSession removes a saved session by the session name returned from /sessions.
 func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Path string `json:"path"`
+		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if req.Path == "" {
-		http.Error(w, "path required", http.StatusBadRequest)
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		http.Error(w, "name required", http.StatusBadRequest)
+		return
+	}
+	if name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+		http.Error(w, "invalid session name", http.StatusBadRequest)
 		return
 	}
 	dir := s.ctl().SessionDir()
-	if dir == "" || !strings.HasSuffix(req.Path, ".jsonl") {
-		http.Error(w, "invalid path", http.StatusBadRequest)
+	if dir == "" {
+		http.Error(w, "sessions disabled", http.StatusBadRequest)
 		return
 	}
-	abs, _ := filepath.Abs(req.Path)
-	absDir, _ := filepath.Abs(dir)
-	if !strings.HasPrefix(abs, absDir) {
+	target := filepath.Join(dir, name+".jsonl")
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		http.Error(w, "invalid session path", http.StatusBadRequest)
+		return
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		http.Error(w, "invalid session dir", http.StatusBadRequest)
+		return
+	}
+	rel, err := filepath.Rel(absDir, abs)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 		http.Error(w, "path outside session dir", http.StatusForbidden)
 		return
 	}
-	if err := os.Remove(req.Path); err != nil {
+	if filepath.Clean(abs) == filepath.Clean(s.ctl().SessionPath()) {
+		http.Error(w, "cannot delete active session", http.StatusConflict)
+		return
+	}
+	if err := os.Remove(abs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -1064,4 +962,3 @@ func (s *Server) skills(w http.ResponseWriter, _ *http.Request) {
 	}
 	writeJSON(w, out)
 }
-// DEBUG: verify stat-card__label text exists in HTML
