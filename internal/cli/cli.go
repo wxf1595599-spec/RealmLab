@@ -1426,7 +1426,9 @@ func providersWithMissingKeys(cfg *config.Config) []config.ProviderEntry {
 		cfg.DefaultModel,
 		cfg.Agent.PlannerModel,
 		cfg.Agent.SubagentModel,
-		cfg.Agent.AutoPlanClassifier,
+	}
+	if !strings.EqualFold(strings.TrimSpace(cfg.Agent.AutoPlan), "off") {
+		refs = append(refs, cfg.Agent.AutoPlanClassifier)
 	}
 	if len(cfg.Agent.SubagentModels) > 0 {
 		keys := make([]string, 0, len(cfg.Agent.SubagentModels))

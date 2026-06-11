@@ -304,6 +304,27 @@ func TestProvidersWithMissingKeysIncludesReferencedSecondaryModels(t *testing.T)
 	}
 }
 
+func TestProvidersWithMissingKeysSkipsDisabledAutoPlanClassifier(t *testing.T) {
+	cfg := config.Default()
+	cfg.Agent.AutoPlan = "off"
+	cfg.Agent.AutoPlanClassifier = "mimo-flash/mimo-v2.5"
+	t.Setenv("DEEPSEEK_API_KEY", "test-key")
+	t.Setenv("MIMO_API_KEY", "")
+
+	if missing := providersWithMissingKeys(cfg); len(missing) != 0 {
+		t.Fatalf("missing providers = %+v, want none when auto-plan classifier is disabled", missing)
+	}
+
+	cfg.Agent.AutoPlan = "on"
+	missing := providersWithMissingKeys(cfg)
+	if len(missing) != 1 {
+		t.Fatalf("missing providers = %+v, want enabled auto-plan classifier provider", missing)
+	}
+	if missing[0].APIKeyEnv != "MIMO_API_KEY" {
+		t.Fatalf("missing key env = %q, want MIMO_API_KEY", missing[0].APIKeyEnv)
+	}
+}
+
 type cliRecordSink struct {
 	events []event.Kind
 }
