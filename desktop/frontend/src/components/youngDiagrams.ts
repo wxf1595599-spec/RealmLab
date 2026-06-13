@@ -37,22 +37,8 @@ function expandShape(rows: number[], content: string | undefined): string {
   // 2D array of cell content. Each cell is `\square` by default
   // (visible Unicode white-square) so the diagram has uniform width
   // AND is actually visible to the reader.
-  //
-  // Each cell is wrapped in `\raisebox{-0.35em}{...}` to nudge the
-  // square glyph down by ~half the math-axis offset. Without this,
-  // each row's square sits centred on its baseline, and the gap
-  // between the bottom of one square and the top of the next is
-  // roughly half the math-axis height — visible white space between
-  // rows. The negative shift pulls the square down so consecutive
-  // rows touch (Young diagrams are conventionally drawn as a single
-  // connected shape, not as separate boxes with gaps).
-  //
-  // The raise argument uses `\square` directly (no `$…$` wrapper) so
-  // the raise-box content stays math-mode-safe even when the whole
-  // macro is itself already wrapped in `$…$` by the prose case —
-  // nesting `$` inside `$…$` would break katex's parser.
   const cells: string[][] = Array.from({ length: rows.length }, () =>
-    Array(maxN).fill("\\raisebox{-0.35em}{\\square}"),
+    Array(maxN).fill("\\square"),
   );
 
   if (content) {
@@ -83,34 +69,28 @@ function expandShape(rows: number[], content: string | undefined): string {
       const cs = splitAtTopLevel(contentRows[i], "&");
       for (let j = 0; j < cs.length && j < rows[i]; j++) {
         const c = cs[j].trim();
-        // Empty cells get a raised \square (the default); filled cells
-        // get the same raise so all cells in a row share the same
-        // vertical position. Without the raise, `\square` centres on the
-        // math axis while text sits on the baseline.
-        //
-        // We pass `c` directly into the raise argument — NOT wrapped in
-        // `$…$`. The whole Young-diagram macro is already inside math
-        // mode (either the model wrote `$…$`/`$$…$$`, or the prose
-        // wrapper added it), so nesting `$` inside `$…$` would break the
-        // parser. `\raisebox{...}{<math content>}` works for any math
-        // token without an extra `$…$` wrapper.
-        cells[i][j] = c === ""
-          ? "\\raisebox{-0.35em}{\\square}"
-          : `\\raisebox{-0.35em}{${c}}`;
+        cells[i][j] = c === "" ? "\\square" : c;
       }
     }
   }
 
-  // Each row is left-aligned by `\begin{array}{l}…\end{array}` plus the
-  // joined cells, with rows separated by `\\`. Empty / missing trailing
-  // cells in shorter rows are already absent because we slice.
+  // Use per-row negative spacing `\\\\[Xem]` between rows instead of the
+  // default `\\`. The default katex display math baseline-to-baseline
+  // spacing is 1.2em, but a `\square` glyph is only ~0.85em tall and
+  // sits centred on the math axis (so its bottom is ~0.15em below the
+  // baseline). With the default spacing, the gap between the bottom of
+  // one row's square and the top of the next is 1.2 − 0.85 = 0.35em
+  // of visible white space — the diagram looks like a column of
+  // disconnected boxes. `\\\\[-0.4em]` pulls each subsequent row up
+  // by 0.4em (roughly the math-axis offset), so adjacent squares
+  // touch. This is a *per-row spacing* fix, not a per-cell vertical
+  // shift: the offset is symmetric across the diagram, so all rows
+  // stay aligned.
   //
-  // Cells are joined with `\!` (negative thin space, -0.1667em) rather
-  // than `\,` (positive thin space, +0.1667em). The two cancel out
-  // exactly, giving *zero* visible spacing between adjacent boxes —
-  // which is how Young diagrams are conventionally drawn. `\,` would
-  // leave a visible gap between every box, making the diagram look
-  // like a row of spaced-out boxes rather than a connected shape.
+  // Earlier versions tried wrapping each cell in `\raisebox{-0.35em}`
+  // which does NOT close the gap (it shifts the whole diagram down
+  // uniformly; the relative distance between row baselines is
+  // invariant). The `\\\\[-0.4em]` approach fixes the root cause.
   const arrRows = cells.map((row, ri) =>
     row.slice(0, rows[ri]).join(" \\! "),
   );
@@ -119,7 +99,11 @@ function expandShape(rows: number[], content: string | undefined): string {
   // shorter rows just have fewer cells to the right. `{c}` would
   // centre each row relative to the widest row, which doesn't look
   // like a Young diagram.
-  return "\\begin{array}{l}" + arrRows.join(" \\\\ ") + "\\end{array}";
+  return (
+    "\\begin{array}{l}" +
+    arrRows.join(" \\\\[-0.4em] ") +
+    "\\end{array}"
+  );
 }
 
 // Find the end of a `\yng(…)` or `\young(…)` call, including optional

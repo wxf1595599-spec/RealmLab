@@ -462,39 +462,38 @@ check("expandYoungDiagrams uses flush cells (\\! cancels \\,) ", () => {
   const out = expandYoungDiagrams("\\yng(3)");
   return out.includes("\\!") && !out.includes("\\, ");
 });
-check("expandYoungDiagrams raises cells so rows are flush (no vertical gap)", () => {
-  // The math axis positions a \square glyph centred on the row baseline,
-  // which leaves a visible ~0.2-0.3em gap between the bottom of one
-  // row's box and the top of the next row's box. Wrapping each cell in
-  // \raisebox{-0.35em}{...} shifts the square down by half the math-axis
-  // offset so consecutive rows touch. Without this, a multi-row diagram
-  // looks like a column of disconnected boxes.
+check("expandYoungDiagrams uses flush rows (\\[-0.4em] closes the math-axis gap)", () => {
+  // The math axis positions a \square glyph centred on the row
+  // baseline, which leaves a visible ~0.4em gap between the bottom of
+  // one row's box and the top of the next row's box when the default
+  // 1.2em baseline-to-baseline spacing is used. Using `\\[-0.4em]`
+  // between rows pulls each subsequent row up by the math-axis offset,
+  // so consecutive rows touch. (Earlier versions tried wrapping each
+  // cell in `\raisebox{-0.35em}` which does NOT close the gap —
+  // uniform translation can't change the relative distance between
+  // row baselines.)
   const out = expandYoungDiagrams("\\yng(2,1)");
-  return out.includes("\\raisebox{-0.35em}");
+  return out.includes("\\\\[-0.4em]");
 });
 check("expandYoungDiagrams substitutes correct array form", () => {
   // Direct unit test on the translator — no need to go through the
   // full pipeline for this assertion.
   const out = expandYoungDiagrams("\\yng(2,1)");
   return out.includes("\\begin{array}{l}")
-    && out.includes("\\raisebox{-0.35em}")
-    && out.includes(" \\! ")
-    && out.includes(" \\\\ ");
+    && out.includes("\\square")
+    && out.includes(" \\\\[-0.4em] ");
 });
 check("expandYoungDiagrams handles \\yng with content", () => {
   // Bare \yng in prose gets wrapped in `$…$` so remark-math sees it as
   // math; macros already inside a `$…$` block just substitute the inner
   // form (the surrounding delimiters are preserved).
   // Cells are joined with `\!` (negative thin space) so adjacent
-  // boxes are flush, and each cell is raised by -0.35em so consecutive
-  // rows sit flush (no math-axis gap between rows).
-  //
-  // The raise argument uses `\square` / raw tokens directly — NOT
-  // wrapped in `$…$` — because the whole macro is already inside math
-  // mode (whether the model wrote `$…$` or the prose wrapper added
-  // it). Nesting `$` inside `$…$` would break the katex parser.
+  // boxes are flush. Row separators use `\\[-0.4em]` (per-row
+  // negative spacing) so consecutive rows touch — the math-axis
+  // offset of `\square` and similar glyphs is ~0.4em, which the
+  // default 1.2em baseline spacing leaves as visible white space.
   const out = expandYoungDiagrams("\\yng(2,1){a&b\\\\c}");
-  return out === "$\\begin{array}{l}\\raisebox{-0.35em}{a} \\! \\raisebox{-0.35em}{b} \\\\ \\raisebox{-0.35em}{c}\\end{array}$";
+  return out === "$\\begin{array}{l}a \\! b \\\\[-0.4em] c\\end{array}$";
 });
 check("expandYoungDiagrams leaves non-Young macros alone", () => {
   const out = expandYoungDiagrams("\\frac{a}{b}");
