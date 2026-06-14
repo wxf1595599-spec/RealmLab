@@ -25,7 +25,13 @@ const LiveStreamContext = createContext<LiveStream | undefined>(undefined);
 
 const LiveAssistantMessage = memo(function LiveAssistantMessage({ item, defaultExpanded = false }: { item: AssistantItem; defaultExpanded?: boolean }) {
   const live = useContext(LiveStreamContext);
-  const shown = live && live.id === item.id ? { ...item, text: live.text, reasoning: live.reasoning, streaming: true, reasoningComplete: live.reasoningComplete } : item;
+  const shown = useMemo(
+    () =>
+      live && live.id === item.id
+        ? { ...item, text: live.text, reasoning: live.reasoning, streaming: true, reasoningComplete: live.reasoningComplete }
+        : item,
+    [item, live?.id, live?.text, live?.reasoning, live?.reasoningComplete],
+  );
   return <AssistantMessage item={shown} defaultExpanded={defaultExpanded} />;
 });
 
