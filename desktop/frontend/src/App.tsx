@@ -107,6 +107,7 @@ import {
 import { applyTextSize, DEFAULT_TEXT_SIZE, getTextSize, nextTextSize } from "./lib/textSize";
 import { useWindowStatePersistence } from "./lib/windowState";
 import { availableWorkspacePanelWidth, resolveWorkspacePanelWidth, workspacePanelAriaMinWidth } from "./lib/workspaceLayout";
+import { isCloseTabShortcut } from "./lib/keyboardShortcuts";
 import logoWordmark from "./assets/logo-wordmark.svg";
 
 const SIDEBAR_COLLAPSED_KEY = "reasonix.sidebar.collapsed";
@@ -2144,14 +2145,14 @@ export default function App() {
   useEffect(() => {
     if (!activeTabId) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
+      if (isCloseTabShortcut(e, desktopPlatform)) {
         e.preventDefault();
         handleTabClose(activeTabId);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [activeTabId, handleTabClose]);
+  }, [activeTabId, desktopPlatform, handleTabClose]);
 
   const paletteItems = useMemo<PaletteItem[]>(() => {
     const cmds: PaletteItem[] = [
