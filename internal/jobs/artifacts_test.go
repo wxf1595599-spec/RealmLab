@@ -128,6 +128,29 @@ func TestSetActiveSessionPathMigratesRunningJobArtifacts(t *testing.T) {
 	}
 }
 
+func TestSetActiveSessionPathAdoptsUnscopedTemporaryJobs(t *testing.T) {
+	sessionPath := filepath.Join(t.TempDir(), "session.jsonl")
+	m := NewManager(event.Discard)
+	defer m.Close()
+
+	j := m.StartForSession("", "task", "temporary", func(context.Context, io.Writer) (string, error) {
+		return "temporary answer", nil
+	})
+	<-j.done
+
+	m.SetActiveSessionPath("session", sessionPath)
+	res := m.WaitForSession(context.Background(), "session", []string{j.ID}, 1)
+	if len(res) != 1 || !strings.Contains(res[0].Output, "temporary answer") {
+		t.Fatalf("adopted wait = %+v, want temporary answer", res)
+	}
+	if _, _, ok := m.OutputForSession("", j.ID); !ok {
+		t.Fatalf("legacy unscoped lookup should still find adopted job %s", j.ID)
+	}
+	if _, err := os.Stat(filepath.Join(ArtifactDir(sessionPath), j.ID+jobLogExt)); err != nil {
+		t.Fatalf("adopted artifact should be under persistent sidecar: %v", err)
+	}
+}
+
 func TestSetActiveSessionPathReportsMigrationFailure(t *testing.T) {
 	dir := t.TempDir()
 	sessionPath := filepath.Join(dir, "session.jsonl")

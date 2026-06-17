@@ -766,6 +766,11 @@ func (m *Manager) SetActiveSessionPath(parentSession, sessionPath string) {
 		return
 	}
 	oldDir := m.artifactDirLocked(parentSession)
+	adoptDefault := false
+	if _, hasDir := m.artifactDirs[parentSession]; !hasDir && m.hasUnscopedJobsLocked() {
+		oldDir = m.artifactDirLocked("")
+		adoptDefault = true
+	}
 	newDir := ArtifactDir(sessionPath)
 	m.artifactDirs[parentSession] = newDir
 	loaded := m.loaded[parentSession]
@@ -776,12 +781,52 @@ func (m *Manager) SetActiveSessionPath(parentSession, sessionPath string) {
 			m.recordArtifactMigrationError(parentSession, err)
 		} else {
 			m.mu.Lock()
+			if adoptDefault {
+				m.adoptUnscopedJobsLocked(parentSession)
+			}
 			m.rebaseSessionArtifactsLocked(parentSession, newDir)
 			m.mu.Unlock()
 		}
 	}
 	if !loaded {
 		m.loadSessionArtifacts(parentSession, newDir)
+	}
+}
+
+func (m *Manager) hasUnscopedJobsLocked() bool {
+	for _, j := range m.jobs {
+		if j != nil && strings.TrimSpace(j.SessionID) == "" {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Manager) adoptUnscopedJobsLocked(parentSession string) {
+	parentSession = strings.TrimSpace(parentSession)
+	if parentSession == "" {
+		return
+	}
+	for oldKey, j := range m.jobs {
+		if j == nil || strings.TrimSpace(j.SessionID) != "" {
+			continue
+		}
+		newKey := jobKey(parentSession, j.ID)
+		if existing := m.jobs[newKey]; existing != nil && existing != j {
+			j.mu.Lock()
+			j.artifactErr = "migration: job id collision while adopting temporary session"
+			j.artifactComplete = false
+			j.mu.Unlock()
+			continue
+		}
+		delete(m.jobs, oldKey)
+		j.SessionID = parentSession
+		m.jobs[newKey] = j
+		for i, key := range m.order {
+			if key == oldKey {
+				m.order[i] = newKey
+			}
+		}
 	}
 }
 
