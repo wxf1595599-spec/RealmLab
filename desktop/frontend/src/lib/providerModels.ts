@@ -16,6 +16,21 @@ export function providerDefaultModel(currentDefault: string, models: string[]): 
   return currentDefault && models.includes(currentDefault) ? currentDefault : models[0] ?? "";
 }
 
+export function providerApiKeyEnvForSave(name: string, apiKeyEnv: string, keyDraft: string): string {
+  const explicit = apiKeyEnv.trim();
+  if (explicit) return explicit;
+  return keyDraft.trim() ? apiKeyEnvFromProviderName(name) : "";
+}
+
+export function apiKeyEnvFromProviderName(name: string): string {
+  const stem = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return stem ? `${stem}_API_KEY` : "CUSTOM_API_KEY";
+}
+
 export function isLikelyChatModel(model: string): boolean {
   const lower = model.trim().toLowerCase();
   if (!lower) return false;

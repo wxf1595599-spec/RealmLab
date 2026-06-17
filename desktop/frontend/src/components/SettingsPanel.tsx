@@ -5,7 +5,7 @@ import { asArray } from "../lib/array";
 import { useDeferredClose } from "../lib/useMountTransition";
 import { app } from "../lib/bridge";
 import { normalizeLangPref, useI18n, useT, type DictKey, type LangPref } from "../lib/i18n";
-import { inferredVisionModels, mergedFetchedProviderModels, providerDefaultModel, providerModelCandidates } from "../lib/providerModels";
+import { apiKeyEnvFromProviderName, inferredVisionModels, mergedFetchedProviderModels, providerApiKeyEnvForSave, providerDefaultModel, providerModelCandidates } from "../lib/providerModels";
 import { useUpdater } from "../lib/useUpdater";
 import {
   THEME_STYLES,
@@ -4174,15 +4174,6 @@ function parseBotListInput(value: string): string[] {
     .filter(Boolean));
 }
 
-function apiKeyEnvFromProviderName(name: string): string {
-  const stem = name
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return stem ? `${stem}_API_KEY` : "CUSTOM_API_KEY";
-}
-
 function ProviderEditor({
   initial,
   kinds,
@@ -4265,7 +4256,7 @@ function ProviderEditor({
     setFetchStatus(null);
     setFetchErr(null);
     try {
-      const effectiveApiKeyEnv = apiKeyEnv.trim() || apiKeyEnvFromProviderName(name);
+      const effectiveApiKeyEnv = providerApiKeyEnvForSave(name, apiKeyEnv, keyDraft);
       if (!apiKeyEnv.trim()) setApiKeyEnv(effectiveApiKeyEnv);
       if (keyDraft.trim()) await app.SetProviderKey(effectiveApiKeyEnv, keyDraft.trim());
       const fetched = await app.FetchProviderModels({
@@ -4307,7 +4298,7 @@ function ProviderEditor({
   const save = async () => {
     const ms = parseProviderListInput(models);
     const vms = parseProviderListInput(visionModels).filter((model) => ms.includes(model));
-    const effectiveApiKeyEnv = apiKeyEnv.trim() || apiKeyEnvFromProviderName(name);
+    const effectiveApiKeyEnv = providerApiKeyEnvForSave(name, apiKeyEnv, keyDraft);
     if (keyDraft.trim()) await app.SetProviderKey(effectiveApiKeyEnv, keyDraft.trim());
     onSave({
       name: name.trim(),
@@ -4370,7 +4361,7 @@ function ProviderEditor({
     .split(",")
     .map((m) => m.trim())
     .filter(Boolean);
-  const canFetch = Boolean(name.trim() && baseUrl.trim() && (keyDraft.trim() || apiKeyEnv.trim()));
+  const canFetch = Boolean(name.trim() && baseUrl.trim());
 
   const protocolField = initial ? (
     <select className="mem-select" value={kind} onChange={(e) => setKind(e.target.value)}>

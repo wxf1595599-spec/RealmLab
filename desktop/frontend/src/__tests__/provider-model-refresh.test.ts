@@ -5,6 +5,7 @@ import {
   isLikelyChatModel,
   isLikelyVisionModel,
   mergedFetchedProviderModels,
+  providerApiKeyEnvForSave,
   providerDefaultModel,
   providerModelCandidates,
 } from "../lib/providerModels";
@@ -116,6 +117,24 @@ eq(
   providerDefaultModel("deleted", ["coding-pro", "chat"]),
   "coding-pro",
   "falls back to first saved model when default is unavailable",
+);
+
+eq(
+  providerApiKeyEnvForSave("Local Gateway", "", ""),
+  "",
+  "keeps custom provider keyless when no key env or key value is supplied",
+);
+
+eq(
+  providerApiKeyEnvForSave("Local Gateway", "", "sk-test"),
+  "LOCAL_GATEWAY_API_KEY",
+  "creates a key env when saving an inline key for a new custom provider",
+);
+
+eq(
+  providerApiKeyEnvForSave("Local Gateway", "GATEWAY_KEY", ""),
+  "GATEWAY_KEY",
+  "preserves an explicitly configured key env",
 );
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

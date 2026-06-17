@@ -1152,6 +1152,102 @@ func TestModelsForTabOnlyListsProviderAccessWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestModelsForTabListsCustomMultiModelProviderWithoutMetadata(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	t.Setenv("LOCAL_API_KEY", "sk-test")
+	if err := os.MkdirAll(filepath.Dir(config.UserConfigPath()), 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(config.UserConfigPath(), []byte(`
+default_model = "local/model-a"
+
+[desktop]
+provider_access = ["local"]
+
+[[providers]]
+name = "local"
+kind = "openai"
+base_url = "http://127.0.0.1:23333/v1"
+models = ["model-a", "model-b"]
+default = "model-a"
+api_key_env = "LOCAL_API_KEY"
+`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	models := NewApp().Models()
+	refs := modelRefsFromView(models)
+	for _, want := range []string{"local/model-a", "local/model-b"} {
+		if !refs[want] {
+			t.Fatalf("Models() refs = %+v, missing %s", models, want)
+		}
+	}
+	if len(models) != 2 {
+		t.Fatalf("Models() len = %d, want 2: %+v", len(models), models)
+	}
+}
+
+func TestModelsForTabListsKeylessCustomMultiModelProvider(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	if err := os.MkdirAll(filepath.Dir(config.UserConfigPath()), 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(config.UserConfigPath(), []byte(`
+default_model = "local/model-a"
+
+[desktop]
+provider_access = ["local"]
+
+[[providers]]
+name = "local"
+kind = "openai"
+base_url = "http://127.0.0.1:23333/v1"
+models = ["model-a", "model-b"]
+default = "model-a"
+`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	models := NewApp().Models()
+	refs := modelRefsFromView(models)
+	for _, want := range []string{"local/model-a", "local/model-b"} {
+		if !refs[want] {
+			t.Fatalf("Models() refs = %+v, missing %s", models, want)
+		}
+	}
+}
+
+func TestModelsForTabListsLoopbackCustomProviderWithMissingKeyEnv(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	if err := os.MkdirAll(filepath.Dir(config.UserConfigPath()), 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(config.UserConfigPath(), []byte(`
+default_model = "local/model-a"
+
+[desktop]
+provider_access = ["local"]
+
+[[providers]]
+name = "local"
+kind = "openai"
+base_url = "http://127.0.0.1:23333/v1"
+models = ["model-a", "model-b"]
+default = "model-a"
+api_key_env = "LOCAL_API_KEY"
+`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	models := NewApp().Models()
+	refs := modelRefsFromView(models)
+	for _, want := range []string{"local/model-a", "local/model-b"} {
+		if !refs[want] {
+			t.Fatalf("Models() refs = %+v, missing %s", models, want)
+		}
+	}
+}
+
 func TestModelsForTabListsMimoAPIPaidAccess(t *testing.T) {
 	isolateDesktopUserDirs(t)
 	t.Setenv("MIMO_API_KEY", "sk-test")
