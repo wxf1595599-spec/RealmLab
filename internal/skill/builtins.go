@@ -30,6 +30,7 @@ How to operate:
 - Cast a wide net first (LSP/code_index for symbols, grep for references, ls/glob for structure) to map the territory; then read the 3-10 most relevant files in full.
 - Don't read every file — be selective. Breadth on the first pass, depth only where the question demands it.
 - Stop exploring as soon as you can answer. The parent doesn't see your tool calls, so over-exploration is pure waste.
+- If the task asks about multiple independent areas (different files, directories, or topics), use parallel_tasks to investigate them concurrently rather than sequentially.
 
 Your final answer:
 - One paragraph (or a few short bullets). Lead with the conclusion.
@@ -50,6 +51,7 @@ How to operate:
 - For "is Y supported" questions: fetch the canonical reference, then verify against the local code.
 - For "what's our policy on Z" / "where do we use Q": local code first, web only to compare against external standards.
 - Cap yourself at ~10 tool calls. If you can't converge, return what you have plus a note on what's missing.
+- If the task has multiple independent research questions, use parallel_tasks to dispatch them concurrently — each sub-task handles one question.
 
 Your final answer:
 - One paragraph (or short bullets). Lead with the conclusion.
@@ -230,6 +232,16 @@ func normalizeExtraToolNames(names []string) []string {
 	return out
 }
 
+func removeString(slice []string, s string) []string {
+	out := make([]string, 0, len(slice))
+	for _, v := range slice {
+		if v != s {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 func withOptionalCodeGraphHint(body string, enabled bool) string {
 	if !enabled {
 		return body
@@ -281,8 +293,10 @@ func appendUniqueToolNames(base []string, extra ...string) []string {
 // builtinSkills returns the shipped skills. A fresh slice each call so callers
 // can't mutate the shared set.
 func builtinSkills() []Skill {
-	readCodeTools := []string{"read_file", "ls", "glob", "grep", "code_index"}
+	readCodeTools := []string{"read_file", "ls", "glob", "grep", "code_index", "parallel_tasks"}
 	reviewTools := append(append([]string(nil), readCodeTools...), "bash")
+	// Remove parallel_tasks from review tools — reviews are explicitly serial.
+	reviewTools = removeString(reviewTools, "parallel_tasks")
 	return []Skill{
 		{
 			Name:        "init",
