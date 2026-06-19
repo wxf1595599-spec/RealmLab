@@ -3729,8 +3729,6 @@ type topicSummary struct {
 }
 
 func (a *App) ListProjectTree() []ProjectNode {
-	os.Stderr.WriteString(fmt.Sprintf("// ListProjectTree: scanning %d session dirs...\n", len(a.knownSessionDirs())))
-
 	migrateLegacySessionsIntoGlobalTopics(config.SessionDir())
 	f := loadProjectsFile()
 	out := []ProjectNode{}
@@ -3755,6 +3753,7 @@ func (a *App) ListProjectTree() []ProjectNode {
 		mergeMu sync.Mutex
 		wg      sync.WaitGroup
 	)
+	cacheToken := projectSessionCache.versionToken()
 	for _, dir := range a.knownSessionDirs() {
 		infos, titles, ok := projectSessionCache.get(dir)
 		if ok {
@@ -3771,7 +3770,6 @@ func (a *App) ListProjectTree() []ProjectNode {
 			// Compute signature cheaply (ReadDir + Stat, no file content).
 			sig, _, err := topicSessionDirSnapshot(dir)
 			if err != nil {
-				os.Stderr.WriteString(fmt.Sprintf("// ListProjectTree: snapshot err %s: %v\n", filepath.Base(dir), err))
 				return
 			}
 
@@ -3782,7 +3780,7 @@ func (a *App) ListProjectTree() []ProjectNode {
 				if titles == nil {
 					titles = map[string]string{}
 				}
-				projectSessionCache.put(dir, infos, titles)
+				projectSessionCache.put(dir, infos, titles, cacheToken)
 				mergeMu.Lock()
 				mergeSessionInfos(dir, infos, titles, sessionInfos, sessionTitles, topicSummaries)
 				mergeMu.Unlock()
@@ -3795,7 +3793,7 @@ func (a *App) ListProjectTree() []ProjectNode {
 				return
 			}
 			titles := loadSessionTitles(dir)
-			projectSessionCache.put(dir, infos, titles)
+			projectSessionCache.put(dir, infos, titles, cacheToken)
 
 			// Persist to disk cache for next startup.
 			_ = sessionDiskCacher.putDir(dir, sig, infos, titles)
@@ -3985,8 +3983,6 @@ func (a *App) ListProjectTree() []ProjectNode {
 		node.Children = children
 		out = append(out, node)
 	}
-
-	os.Stderr.WriteString(fmt.Sprintf("// ListProjectTree: done (%d sessions, %d nodes)\n", len(sessionInfos), len(out)))
 
 	return applyPinnedProjectOrder(applyProjectTreeOrder(out, f.SidebarOrder), f.PinnedProjects)
 }
@@ -4501,9 +4497,9 @@ func (a *App) findTopicSessionForTarget(scope, workspaceRoot, topicID string) (s
 }
 
 type topicSessionFileSignature struct {
-	name    string
-	size    int64
-	modTime int64
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	ModTime int64  `json:"mod_time"`
 }
 
 type topicSessionMatch struct {
@@ -4528,21 +4524,14 @@ type sessionListCacheEntry struct {
 }
 
 type sessionListCache struct {
-	mu    sync.Mutex
-	byDir map[string]sessionListCacheEntry
-	dirty atomic.Bool // set true on tree change, cleared on first re-read
+	mu      sync.Mutex
+	byDir   map[string]sessionListCacheEntry
+	version atomic.Uint64
 }
 
 func (c *sessionListCache) get(dir string) ([]agent.SessionInfo, map[string]string, bool) {
-	if c.dirty.Load() {
-		return nil, nil, false
-	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// re-check: invalidate() could have set dirty between Load and Lock.
-	if c.dirty.Load() {
-		return nil, nil, false
-	}
 	e, ok := c.byDir[dir]
 	if !ok {
 		return nil, nil, false
@@ -4550,21 +4539,24 @@ func (c *sessionListCache) get(dir string) ([]agent.SessionInfo, map[string]stri
 	return e.infos, e.titles, true
 }
 
-func (c *sessionListCache) put(dir string, infos []agent.SessionInfo, titles map[string]string) {
-	if c.dirty.Load() {
-		return // don't cache stale data
+func (c *sessionListCache) versionToken() uint64 {
+	return c.version.Load()
+}
+
+func (c *sessionListCache) put(dir string, infos []agent.SessionInfo, titles map[string]string, token uint64) {
+	if c.version.Load() != token {
+		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// re-check: invalidate() could have set dirty between Load and Lock.
-	if c.dirty.Load() {
+	if c.version.Load() != token {
 		return
 	}
 	c.byDir[dir] = sessionListCacheEntry{infos: infos, titles: titles}
 }
 
 func (c *sessionListCache) invalidate() {
-	c.dirty.Store(true)
+	c.version.Add(1)
 	c.mu.Lock()
 	c.byDir = map[string]sessionListCacheEntry{}
 	c.mu.Unlock()
@@ -4660,7 +4652,8 @@ func (c *sessionDiskCache) load() (*sessionDiskCacheData, error) {
 		return nil, err
 	}
 	if d.Version != sessionDiskCacheVersion {
-		return &sessionDiskCacheData{Version: sessionDiskCacheVersion, ByDir: map[string]sessionDiskCacheDirEntry{}}, nil
+		c.cache = &sessionDiskCacheData{Version: sessionDiskCacheVersion, ByDir: map[string]sessionDiskCacheDirEntry{}}
+		return c.cache, nil
 	}
 	if d.ByDir == nil {
 		d.ByDir = map[string]sessionDiskCacheDirEntry{}
@@ -4702,17 +4695,19 @@ func (c *sessionDiskCache) putDir(dir string, signature []topicSessionFileSignat
 		Titles:    titles,
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	data.ByDir[key] = entry
 	data.Updated = time.Now()
-	// save under the lock — json.MarshalIndent must not race with concurrent writes.
 	raw, err := json.MarshalIndent(data, "", "  ")
-	c.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	path := c.path
 	if path == "" {
 		path = filepath.Join(config.MemoryUserDir(), "project-session-cache.json")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
 	}
 	return os.WriteFile(path, raw, 0o644)
 }
@@ -4804,16 +4799,16 @@ func topicSessionDirSnapshot(dir string) ([]topicSessionFileSignature, []string,
 			continue
 		}
 		signature = append(signature, topicSessionFileSignature{
-			name:    name,
-			size:    info.Size(),
-			modTime: info.ModTime().UnixNano(),
+			Name:    name,
+			Size:    info.Size(),
+			ModTime: info.ModTime().UnixNano(),
 		})
 		if isSession {
 			sessionNames = append(sessionNames, name)
 		}
 	}
 	sort.Slice(signature, func(i, j int) bool {
-		return signature[i].name < signature[j].name
+		return signature[i].Name < signature[j].Name
 	})
 	sort.Strings(sessionNames)
 	return signature, sessionNames, nil
