@@ -1461,50 +1461,206 @@
 }
 
 :root[data-theme="dark"][data-theme-style] .app--creation {
-  --stage: #000000;
-  --surface: #101114;
-  --surface-2: #15161a;
-  --surface-3: #0b0c0f;
-  --panel: #101114;
-  --bg: #000000;
-  --bg-soft: #0b0c0f;
-  --bg-elev: #101114;
-  --bg-elev-2: #15161a;
-  --sidebar-bg: #101114;
-  --sidebar-hover: #18191d;
-  --chat-bg: #000000;
-  --workspace-preview-bg: #0b0c0f;
-  --workspace-files-bg: #101114;
-  --workspace-files-hover: #18191d;
-  --button-bg: #101114;
-  --button-bg-hover: #15161a;
-  --pill-bg: #101114;
-  --pill-hover-bg: #15161a;
-  --code-bg: #0b0c0f;
+  --stage: #06080b;
+  --surface: #101318;
+  --surface-2: #171b22;
+  --surface-3: #0b0e12;
+  --panel: #101318;
+  --bg: #090c10;
+  --bg-soft: #0b0e12;
+  --bg-elev: #101318;
+  --bg-elev-2: #171b22;
+  --sidebar-bg: #101318;
+  --sidebar-hover: #1b2028;
+  --sidebar-active: rgba(228, 230, 234, 0.1);
+  --chat-bg: #090c10;
+  --workspace-preview-bg: #0b0e12;
+  --workspace-files-bg: #101318;
+  --workspace-files-hover: #1b2028;
+  --workspace-selection-bg: rgba(228, 230, 234, 0.1);
+  --workspace-selection-fg: #e4e6ea;
+  --workspace-selection-bar: #9fa4ad;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-2: rgba(255, 255, 255, 0.18);
+  --border-soft: rgba(255, 255, 255, 0.07);
+  --text: #e4e6ea;
+  --text-2: #9fa4ad;
+  --text-3: #6a707a;
+  --fg: #e4e6ea;
+  --fg-dim: #9fa4ad;
+  --fg-faint: #6a707a;
+  --button-bg: #101318;
+  --button-bg-hover: #171b22;
+  --button-border: rgba(255, 255, 255, 0.1);
+  --button-border-hover: rgba(255, 255, 255, 0.18);
+  --pill-bg: #101318;
+  --pill-border: rgba(255, 255, 255, 0.1);
+  --pill-hover-bg: #171b22;
+  --list-row-hover-bg: #1b2028;
+  --list-row-current-bg: rgba(228, 230, 234, 0.1);
+  --list-row-current-title: #e4e6ea;
+  --list-row-current-meta: #9fa4ad;
+  --tree-row-hover-bg: #1b2028;
+  --tree-row-current-bg: rgba(228, 230, 234, 0.1);
+  --tree-row-current-fg: #e4e6ea;
+  --tree-row-current-icon: #9fa4ad;
+  --tree-row-marker: #9fa4ad;
+  --code-bg: #0b0e12;
+  color: var(--fg);
+  background: var(--bg);
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme-style]:not([data-theme]) .app--creation {
-    --stage: #000000;
-    --surface: #101114;
-    --surface-2: #15161a;
-    --surface-3: #0b0c0f;
-    --panel: #101114;
-    --bg: #000000;
-    --bg-soft: #0b0c0f;
-    --bg-elev: #101114;
-    --bg-elev-2: #15161a;
-    --sidebar-bg: #101114;
-    --sidebar-hover: #18191d;
-    --chat-bg: #000000;
-    --workspace-preview-bg: #0b0c0f;
-    --workspace-files-bg: #101114;
-    --workspace-files-hover: #18191d;
-    --button-bg: #101114;
-    --button-bg-hover: #15161a;
-    --pill-bg: #101114;
-    --pill-hover-bg: #15161a;
-    --code-bg: #0b0c0f;
+    --stage: #06080b;
+    --surface: #101318;
+    --surface-2: #171b22;
+    --surface-3: #0b0e12;
+    --panel: #101318;
+    --bg: #090c10;
+    --bg-soft: #0b0e12;
+    --bg-elev: #101318;
+    --bg-elev-2: #171b22;
+    --sidebar-bg: #101318;
+    --sidebar-hover: #1b2028;
+    --sidebar-active: rgba(228, 230, 234, 0.1);
+    --chat-bg: #090c10;
+    --workspace-preview-bg: #0b0e12;
+    --workspace-files-bg: #101318;
+    --workspace-files-hover: #1b2028;
+    --workspace-selection-bg: rgba(228, 230, 234, 0.1);
+    --workspace-selection-fg: #e4e6ea;
+    --workspace-selection-bar: #9fa4ad;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-2: rgba(255, 255, 255, 0.18);
+    --border-soft: rgba(255, 255, 255, 0.07);
+    --text: #e4e6ea;
+    --text-2: #9fa4ad;
+    --text-3: #6a707a;
+    --fg: #e4e6ea;
+    --fg-dim: #9fa4ad;
+    --fg-faint: #6a707a;
+    --button-bg: #101318;
+    --button-bg-hover: #171b22;
+    --button-border: rgba(255, 255, 255, 0.1);
+    --button-border-hover: rgba(255, 255, 255, 0.18);
+    --pill-bg: #101318;
+    --pill-border: rgba(255, 255, 255, 0.1);
+    --pill-hover-bg: #171b22;
+    --list-row-hover-bg: #1b2028;
+    --list-row-current-bg: rgba(228, 230, 234, 0.1);
+    --list-row-current-title: #e4e6ea;
+    --list-row-current-meta: #9fa4ad;
+    --tree-row-hover-bg: #1b2028;
+    --tree-row-current-bg: rgba(228, 230, 234, 0.1);
+    --tree-row-current-fg: #e4e6ea;
+    --tree-row-current-icon: #9fa4ad;
+    --tree-row-marker: #9fa4ad;
+    --code-bg: #0b0e12;
+    color: var(--fg);
+    background: var(--bg);
+  }
+}
+
+:root[data-theme="light"][data-theme-style] .app--creation {
+  --stage: #ececef;
+  --surface: #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #f4f4f5;
+  --panel: #ffffff;
+  --bg: #f7f7f8;
+  --bg-soft: #f4f4f5;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #fafafa;
+  --sidebar-bg: #ffffff;
+  --sidebar-hover: #f4f4f5;
+  --sidebar-active: rgba(24, 24, 27, 0.08);
+  --chat-bg: #f7f7f8;
+  --workspace-preview-bg: #ffffff;
+  --workspace-files-bg: #ffffff;
+  --workspace-files-hover: #f4f4f5;
+  --workspace-selection-bg: rgba(24, 24, 27, 0.08);
+  --workspace-selection-fg: #18181b;
+  --workspace-selection-bar: #71717a;
+  --border: rgba(24, 24, 27, 0.12);
+  --border-2: rgba(24, 24, 27, 0.2);
+  --border-soft: rgba(24, 24, 27, 0.08);
+  --text: #18181b;
+  --text-2: #52525b;
+  --text-3: #a1a1aa;
+  --fg: #18181b;
+  --fg-dim: #52525b;
+  --fg-faint: #a1a1aa;
+  --button-bg: #ffffff;
+  --button-bg-hover: #fafafa;
+  --button-border: rgba(24, 24, 27, 0.12);
+  --button-border-hover: rgba(24, 24, 27, 0.2);
+  --pill-bg: #ffffff;
+  --pill-border: rgba(24, 24, 27, 0.12);
+  --pill-hover-bg: #fafafa;
+  --list-row-hover-bg: #f4f4f5;
+  --list-row-current-bg: rgba(24, 24, 27, 0.08);
+  --list-row-current-title: #18181b;
+  --list-row-current-meta: #52525b;
+  --tree-row-hover-bg: #f4f4f5;
+  --tree-row-current-bg: rgba(24, 24, 27, 0.08);
+  --tree-row-current-fg: #18181b;
+  --tree-row-current-icon: #52525b;
+  --tree-row-marker: #71717a;
+  --code-bg: #f4f4f5;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme-style]:not([data-theme]) .app--creation {
+    --stage: #ececef;
+    --surface: #ffffff;
+    --surface-2: #ffffff;
+    --surface-3: #f4f4f5;
+    --panel: #ffffff;
+    --bg: #f7f7f8;
+    --bg-soft: #f4f4f5;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #fafafa;
+    --sidebar-bg: #ffffff;
+    --sidebar-hover: #f4f4f5;
+    --sidebar-active: rgba(24, 24, 27, 0.08);
+    --chat-bg: #f7f7f8;
+    --workspace-preview-bg: #ffffff;
+    --workspace-files-bg: #ffffff;
+    --workspace-files-hover: #f4f4f5;
+    --workspace-selection-bg: rgba(24, 24, 27, 0.08);
+    --workspace-selection-fg: #18181b;
+    --workspace-selection-bar: #71717a;
+    --border: rgba(24, 24, 27, 0.12);
+    --border-2: rgba(24, 24, 27, 0.2);
+    --border-soft: rgba(24, 24, 27, 0.08);
+    --text: #18181b;
+    --text-2: #52525b;
+    --text-3: #a1a1aa;
+    --fg: #18181b;
+    --fg-dim: #52525b;
+    --fg-faint: #a1a1aa;
+    --button-bg: #ffffff;
+    --button-bg-hover: #fafafa;
+    --button-border: rgba(24, 24, 27, 0.12);
+    --button-border-hover: rgba(24, 24, 27, 0.2);
+    --pill-bg: #ffffff;
+    --pill-border: rgba(24, 24, 27, 0.12);
+    --pill-hover-bg: #fafafa;
+    --list-row-hover-bg: #f4f4f5;
+    --list-row-current-bg: rgba(24, 24, 27, 0.08);
+    --list-row-current-title: #18181b;
+    --list-row-current-meta: #52525b;
+    --tree-row-hover-bg: #f4f4f5;
+    --tree-row-current-bg: rgba(24, 24, 27, 0.08);
+    --tree-row-current-fg: #18181b;
+    --tree-row-current-icon: #52525b;
+    --tree-row-marker: #71717a;
+    --code-bg: #f4f4f5;
+    color: var(--fg);
+    background: var(--bg);
   }
 }
 
@@ -22348,7 +22504,7 @@ a[href] {
 .app--creation .topicbar__title-button:focus-visible,
 :root[data-theme-style] .app--creation .topicbar__title-button:hover,
 :root[data-theme-style] .app--creation .topicbar__title-button:focus-visible {
-  color: color-mix(in srgb, var(--fg) 84%, var(--accent));
+  color: var(--fg);
 }
 
 .app--creation .topicbar__title-input,
@@ -23242,7 +23398,7 @@ a[href] {
   bottom: 5px;
   width: 2px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--project-accent, var(--accent)) 82%, transparent);
+  background: var(--tree-row-marker);
 }
 
 .app--creation .project-tree__topic-main,
