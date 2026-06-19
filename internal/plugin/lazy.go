@@ -233,6 +233,14 @@ func (lt *lazyTool) Execute(ctx context.Context, args json.RawMessage) (string, 
 		sp.mu.Lock()
 		defer sp.mu.Unlock()
 		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				// A slow cold start can succeed on a later turn after npm/node
+				// caches warm up or a remote MCP endpoint responds. Do not pin
+				// the session into spawnFailed for a transient startup budget miss.
+				sp.state = spawnIdle
+				sp.spawnErr = nil
+				return "", fmt.Errorf("MCP server %q startup timed out — retry this tool on a later turn", sp.spec.Name)
+			}
 			if errors.Is(err, ErrSpawningInFlight) {
 				// Another tab is already spawning this server on the shared
 				// host, but this lazySpawn has no goroutine that can publish

@@ -787,6 +787,17 @@ func TestMigrateSupportData(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(filepath.Join(legacyDir, "sessions"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(filepath.Join(legacyDir, "sessions", "s1.json"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(filepath.Join(legacyDir, "hooks.json"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	res, err := MigrateLegacyIfNeeded()
 	if err != nil {
@@ -809,6 +820,24 @@ func TestMigrateSupportData(t *testing.T) {
 		}
 		if string(data) != expectedContent {
 			t.Errorf("file %s content mismatch: got %q, want %q", rel, string(data), expectedContent)
+		}
+	}
+	if runtime.GOOS != "windows" {
+		for _, check := range []struct {
+			rel  string
+			perm os.FileMode
+		}{
+			{rel: "sessions", perm: 0o700},
+			{rel: "sessions/s1.json", perm: 0o600},
+			{rel: "hooks.json", perm: 0o600},
+		} {
+			info, err := os.Stat(filepath.Join(newDir, check.rel))
+			if err != nil {
+				t.Fatalf("stat migrated %s: %v", check.rel, err)
+			}
+			if got := info.Mode().Perm(); got != check.perm {
+				t.Fatalf("migrated %s mode = %o, want %o", check.rel, got, check.perm)
+			}
 		}
 	}
 }

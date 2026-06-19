@@ -613,17 +613,29 @@ func migrateSupportData(legacyDir, newDir string) []string {
 }
 
 func copyFile(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	parentMode := os.FileMode(0o755)
+	if info.Mode().Perm()&0o077 == 0 {
+		parentMode = 0o700
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), parentMode); err != nil {
 		return err
 	}
 
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	perm := info.Mode().Perm()
+	if perm == 0 {
+		perm = 0o600
+	}
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
 	if err != nil {
 		return err
 	}
@@ -632,16 +644,30 @@ func copyFile(src, dst string) error {
 	if _, err = io.Copy(out, in); err != nil {
 		return err
 	}
-	return out.Sync()
+	if err := out.Sync(); err != nil {
+		return err
+	}
+	return os.Chmod(dst, perm)
 }
 
 func copyDir(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(dst, 0o755); err != nil {
+	perm := info.Mode().Perm()
+	if perm == 0 {
+		perm = 0o700
+	}
+	if err := os.MkdirAll(dst, perm); err != nil {
+		return err
+	}
+	if err := os.Chmod(dst, perm); err != nil {
 		return err
 	}
 

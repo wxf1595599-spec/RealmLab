@@ -828,7 +828,14 @@ func writeConfigFile(path, body string) error {
 	if strings.TrimSpace(path) == "" {
 		return fmt.Errorf("save: empty config path")
 	}
-	return fileutil.AtomicWriteFile(path, []byte(body), 0o644)
+	return fileutil.AtomicWriteFile(path, []byte(body), configFilePerm(path))
+}
+
+func configFilePerm(path string) os.FileMode {
+	if isUserConfigPath(path) {
+		return 0o600
+	}
+	return 0o644
 }
 
 func renderScopeForPath(path string) RenderScope {
