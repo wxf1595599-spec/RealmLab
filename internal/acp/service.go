@@ -131,12 +131,25 @@ type service struct {
 	sessions map[string]*acpSession
 }
 
+// acpController is the slice of the controller's driving port the ACP transport
+// drives: session lifecycle + persistence, turn execution, interactive approval,
+// and the capability surface (commands/skills/MCP prompts). ACP never touches
+// goals, checkpoints, or memory, so it depends on those sub-ports only — not the
+// concrete *control.Controller.
+type acpController interface {
+	control.Lifecycle
+	control.TurnControl
+	control.Approvals
+	control.Capabilities
+	control.SessionPersistence
+}
+
 // acpSession is one open session: its controller, the on-disk transcript path
 // (empty when persistence is off), and the cancel func of the in-flight turn
 // (nil when idle) so session/cancel can abort it.
 type acpSession struct {
 	id         string
-	ctrl       *control.Controller
+	ctrl       acpController
 	sink       *updateSink
 	transcript string
 	cwd        string
@@ -688,7 +701,12 @@ func (s *service) rebuildSession(ctx context.Context, sess *acpSession, cfgState
 	} else if prevPath != "" {
 		newCtrl.SetSessionPath(prevPath)
 	}
-	newCtrl.InheritLifecycleFrom(cur)
+	// InheritLifecycleFrom wires two concrete controllers' turn/hook state; it's a
+	// construction concern, not part of the driving port. cur is always the
+	// *control.Controller the factory built for this session, so this is safe.
+	if prev, ok := cur.(*control.Controller); ok {
+		newCtrl.InheritLifecycleFrom(prev)
+	}
 
 	sess.ctrl = newCtrl
 	sess.model = cfgState.Model
@@ -1103,7 +1121,7 @@ func (s *service) sendAvailableCommands(sess *acpSession) {
 	})
 }
 
-func availableCommandsFor(ctrl *control.Controller) []AvailableCommand {
+func availableCommandsFor(ctrl acpController) []AvailableCommand {
 	if ctrl == nil {
 		return nil
 	}
