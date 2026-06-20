@@ -134,21 +134,15 @@ type Controller struct {
 	cpTurn  int
 	cpBound map[int]int
 
-	// promptMu serialises approval and ask prompts so at most one user decision is
-	// outstanding at a time (parallel read-only tool calls don't normally gate,
-	// writers run serially — but this keeps the contract explicit). Held across
-	// the blocking wait, so it must never be taken by the Approve/Answer paths.
-	promptMu sync.Mutex
+	// approval owns the approval/ask prompt bookkeeping and the runtime approval
+	// posture (ask/auto/yolo, session grants, the just-approved-plan window)
+	// behind its own locks, off c.mu. The Controller keeps the I/O orchestration
+	// (requestApproval/Ask emit events + fire hooks + rebuild the executor gate).
+	// See approval.go.
+	approval approvalManager
 
-	// approvalTimeout bounds how long requestApproval/AnswerQuestion block waiting
-	// for a user decision. Zero (the default) means wait indefinitely, which is
-	// correct for an interactive terminal where the user is present. Bot/headless
-	// frontends set it so an unanswered approval can't wedge the session forever
-	// when the user has walked away (#4626, #4402).
-	approvalTimeout time.Duration
-
-	// mu guards the run state and approval bookkeeping; every critical section
-	// under it is short and non-blocking.
+	// mu guards the run state; every critical section under it is short and
+	// non-blocking.
 	mu          sync.Mutex
 	cancel      context.CancelFunc
 	running     bool
@@ -156,33 +150,8 @@ type Controller struct {
 	autosaveWG  sync.WaitGroup
 	planMode    bool
 	sessionPath string
-	approvals   map[string]pendingApproval
-	asks        map[string]pendingAsk
-	granted     map[string]bool
-	nextID      int
 	// turn counts model turns this session, passed to hooks in their payload.
 	turn int
-	// approvedPlanAutoApproveTools auto-allows writer tool calls without prompting.
-	// Set only while executing a just-approved plan: approving the plan is the
-	// go-ahead, so the model shouldn't re-prompt for every write of the work it
-	// just got cleared to do. Deny rules still bite (those never reach the
-	// approver). Reset when the execution turn returns.
-	approvedPlanAutoApproveTools bool
-
-	// toolApprovalMode is the runtime approval posture for permission-gated tool
-	// calls. "ask" prompts by default, "auto" lets the policy auto-approve the
-	// writer fallback while preserving ask/deny rules, and "yolo" skips every
-	// tool approval prompt except plan approval. It never answers AskRequest.
-	toolApprovalMode string
-
-	// autoApproveTools is "YOLO/full access" mode: while set, every tool approval
-	// request is auto-allowed for the rest of the session (writers and bash run
-	// without asking). It is a deliberate, session-scoped opt-in (the
-	// --dangerously-skip-permissions flag or a runtime toggle), never persisted.
-	// Deny rules are unaffected — they're resolved before the approver, so a
-	// denied tool is still blocked. It never answers AskRequest or plan approval:
-	// those remain user decisions.
-	autoApproveTools bool
 
 	// pendingMemory holds memory notes added mid-session (via "#" quick-add or a
 	// memory edit) that haven't yet been folded into a turn. Compose drains it
@@ -360,11 +329,7 @@ func New(opts Options) *Controller {
 		reg:                    opts.Registry,
 		pluginCtx:              pluginCtx,
 		cpRoot:                 opts.WorkspaceRoot,
-		toolApprovalMode:       ToolApprovalAsk,
-		approvalTimeout:        opts.ApprovalTimeout,
-		approvals:              map[string]pendingApproval{},
-		asks:                   map[string]pendingAsk{},
-		granted:                map[string]bool{},
+		approval:               newApprovalManager(opts.Policy, ToolApprovalAsk, opts.ApprovalTimeout),
 	}
 	// Checkpoints: bind a store to the session and route writer pre-edits into it.
 	c.rebindCheckpoints(opts.SessionPath)
@@ -639,14 +604,8 @@ func (c *Controller) runTurnWithRawDisplay(ctx context.Context, input, raw, disp
 	// The plan is the go-ahead: don't re-prompt for each write of the approved
 	// work. Auto-approve writers for the duration of this execution turn only; a
 	// later turn (even "continue") falls back to the normal per-tool approval.
-	c.mu.Lock()
-	c.approvedPlanAutoApproveTools = true
-	c.mu.Unlock()
-	defer func() {
-		c.mu.Lock()
-		c.approvedPlanAutoApproveTools = false
-		c.mu.Unlock()
-	}()
+	c.approval.setPlanAutoApprove(true)
+	defer c.approval.setPlanAutoApprove(false)
 	if err := c.runner.Run(ctx, c.ComposeSynthetic(planApprovedMessage)); err != nil {
 		return err
 	}
@@ -1313,15 +1272,10 @@ func (c *Controller) Cancel() {
 	cancel := c.cancel
 	if cancel != nil {
 		c.canceling = true
-		for id := range c.approvals {
-			delete(c.approvals, id)
-		}
-		for id := range c.asks {
-			delete(c.asks, id)
-		}
 	}
 	c.mu.Unlock()
 	if cancel != nil {
+		c.approval.clearAll()
 		cancel()
 	}
 }
@@ -1336,18 +1290,16 @@ func (c *Controller) Running() bool {
 // PendingPrompt reports whether the current turn is blocked waiting for a user
 // approval, plan approval, memory approval, or ask-tool answer.
 func (c *Controller) PendingPrompt() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.approvals) > 0 || len(c.asks) > 0
+	return c.approval.hasPending()
 }
 
 // RuntimeStatus reports the active work owned by the foreground controller.
 func (c *Controller) RuntimeStatus() RuntimeStatus {
 	c.mu.Lock()
 	running := c.running
-	pending := len(c.approvals) > 0 || len(c.asks) > 0
 	canceling := c.canceling
 	c.mu.Unlock()
+	pending := c.approval.hasPending()
 	backgroundJobs := len(c.Jobs())
 	return RuntimeStatus{
 		Running:         running,
@@ -1369,10 +1321,7 @@ func (c *Controller) Turn() int {
 // also remembers a grant for the rest of the session so the same approval scope
 // is not re-prompted. Unknown/expired IDs are ignored.
 func (c *Controller) Approve(id string, allow, session, persist bool) {
-	c.mu.Lock()
-	pending := c.approvals[id]
-	delete(c.approvals, id)
-	c.mu.Unlock()
+	pending := c.approval.resolve(id)
 	if pending.reply != nil {
 		pending.reply <- approvalReply{allow: allow, session: session, persist: persist} // buffered, never blocks
 	}
@@ -1390,22 +1339,9 @@ func (c *Controller) EnableInteractiveApproval() {
 	}
 }
 
-func normalizeToolApprovalMode(mode string) string {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case ToolApprovalAuto, "approve", "allow":
-		return ToolApprovalAuto
-	case ToolApprovalYolo, "full", "full-access", "bypass":
-		return ToolApprovalYolo
-	default:
-		return ToolApprovalAsk
-	}
-}
-
 func (c *Controller) newInteractiveGate() *permission.Gate {
 	policy := c.policy
-	c.mu.Lock()
-	mode := normalizeToolApprovalMode(c.toolApprovalMode)
-	c.mu.Unlock()
+	mode := c.approval.mode()
 	switch mode {
 	case ToolApprovalAuto, ToolApprovalYolo:
 		policy.Mode = permission.Allow
@@ -1467,28 +1403,20 @@ func (c *Controller) SteerConsumed() bool {
 // tool exists to get a genuine user decision, and YOLO only auto-approves
 // tool calls; it must not answer the user's questions for them.
 func (c *Controller) Ask(ctx context.Context, questions []event.AskQuestion) ([]event.AskAnswer, error) {
-	c.promptMu.Lock()
-	defer c.promptMu.Unlock()
+	c.approval.promptMu.Lock()
+	defer c.approval.promptMu.Unlock()
 
-	c.mu.Lock()
-	c.nextID++
-	id := strconv.Itoa(c.nextID)
-	reply := make(chan []event.AskAnswer, 1)
-	c.asks[id] = pendingAsk{questions: questions, reply: reply}
-	c.mu.Unlock()
-
+	id, reply := c.approval.registerAsk(questions)
 	c.sink.Emit(event.Event{Kind: event.AskRequest, Ask: event.Ask{ID: id, Questions: questions}})
 
-	waitCtx, cancelWait := c.approvalWaitContext(ctx)
+	waitCtx, cancelWait := c.approval.waitContext(ctx)
 	defer cancelWait()
 
 	select {
 	case ans := <-reply:
 		return ans, nil
 	case <-waitCtx.Done():
-		c.mu.Lock()
-		delete(c.asks, id)
-		c.mu.Unlock()
+		c.approval.cancelAsk(id)
 		return nil, waitCtx.Err()
 	}
 }
@@ -1496,11 +1424,7 @@ func (c *Controller) Ask(ctx context.Context, questions []event.AskQuestion) ([]
 // AnswerQuestion resolves a pending AskRequest by ID with the user's selections.
 // Unknown/expired IDs are ignored.
 func (c *Controller) AnswerQuestion(id string, answers []event.AskAnswer) {
-	c.mu.Lock()
-	pending, ok := c.asks[id]
-	delete(c.asks, id)
-	c.mu.Unlock()
-	if ok {
+	if pending, ok := c.approval.resolveAsk(id); ok {
 		pending.reply <- answers // buffered, never blocks
 	}
 }
@@ -1513,16 +1437,7 @@ func (c *Controller) AnswerQuestion(id string, answers []event.AskAnswer) {
 // requestApproval, so in practice at most one prompt is outstanding; the loops
 // stay general so a future concurrent prompt would still replay correctly.
 func (c *Controller) ReplayPendingPrompts() {
-	c.mu.Lock()
-	approvals := make([]event.Approval, 0, len(c.approvals))
-	for id, p := range c.approvals {
-		approvals = append(approvals, event.Approval{ID: id, Tool: p.tool, Subject: p.subject})
-	}
-	asks := make([]event.Ask, 0, len(c.asks))
-	for id, p := range c.asks {
-		asks = append(asks, event.Ask{ID: id, Questions: p.questions})
-	}
-	c.mu.Unlock()
+	approvals, asks := c.approval.snapshotPrompts()
 	for _, a := range approvals {
 		c.sink.Emit(event.Event{Kind: event.ApprovalRequest, Approval: a})
 	}
@@ -2856,20 +2771,7 @@ func (c *Controller) Jobs() []jobs.View {
 // SetToolApprovalMode changes the runtime approval posture for permission-gated
 // tools. It does not answer business asks or plan approval.
 func (c *Controller) SetToolApprovalMode(mode string) {
-	mode = normalizeToolApprovalMode(mode)
-	var pending []chan approvalReply
-
-	c.mu.Lock()
-	c.toolApprovalMode = mode
-	c.autoApproveTools = mode == ToolApprovalYolo
-	switch mode {
-	case ToolApprovalAuto:
-		pending = c.drainApprovalsLocked(false)
-	case ToolApprovalYolo:
-		pending = c.drainApprovalsLocked(true)
-	}
-	c.mu.Unlock()
-
+	pending := c.approval.setMode(normalizeToolApprovalMode(mode))
 	c.refreshInteractiveGate()
 	for _, reply := range pending {
 		reply <- approvalReply{allow: true}
@@ -2877,9 +2779,7 @@ func (c *Controller) SetToolApprovalMode(mode string) {
 }
 
 func (c *Controller) ToolApprovalMode() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return normalizeToolApprovalMode(c.toolApprovalMode)
+	return c.approval.mode()
 }
 
 // SetAutoApproveTools turns YOLO/full-access mode on or off for the session:
@@ -2916,23 +2816,6 @@ func (c *Controller) SetMode(plan, autoApproveTools bool) {
 	} else {
 		c.SetToolApprovalMode(ToolApprovalAsk)
 	}
-}
-
-// drainApprovalsLocked removes every pending approval gate and returns their
-// reply channels; caller holds c.mu and sends {allow:true} after unlocking.
-func (c *Controller) drainApprovalsLocked(includeExplicitAsk bool) []chan approvalReply {
-	pending := make([]chan approvalReply, 0, len(c.approvals))
-	for id, approval := range c.approvals {
-		if requiresFreshApprovalTool(approval.tool) {
-			continue
-		}
-		if !includeExplicitAsk && !approval.autoDrain {
-			continue
-		}
-		delete(c.approvals, id)
-		pending = append(pending, approval.reply)
-	}
-	return pending
 }
 
 // AutoApproveTools reports whether YOLO/full-access tool auto-approval is on,
@@ -3097,16 +2980,9 @@ type gateApprover struct{ c *Controller }
 
 func (g gateApprover) Approve(ctx context.Context, tool, subject string, args json.RawMessage) (bool, bool, error) {
 	subject = approvalDisplaySubject(tool, subject, args)
-	// Auto-allow without prompting while executing a just-approved plan (the plan
-	// was the approval), during an explicit continuation turn of that approved
-	// plan, or while YOLO/full-access tool auto-approval is on. Deny rules already
-	// bit before this point, so they still block.
-	g.c.mu.Lock()
-	auto := g.c.approvalBypassAllowsLocked(tool)
-	g.c.mu.Unlock()
-	if auto {
-		return true, false, nil
-	}
+	// requestApproval short-circuits the YOLO / just-approved-plan window and any
+	// session grant before it emits a prompt, so the auto-allow paths need no
+	// special-casing here. Deny rules already bit before this point.
 	return g.c.requestApproval(ctx, tool, subject, args)
 }
 
@@ -3488,46 +3364,28 @@ func parseRewind(args string, cps []checkpoint.Meta) (int, RewindScope, error) {
 	return turn, scope, nil
 }
 
-// approvalWaitContext returns the context the approval/ask wait blocks on. When
-// approvalTimeout is zero it just forwards ctx (interactive: wait forever). When
-// positive it layers a timeout so a headless/bot session can't hang on a prompt
-// nobody will answer (#4626, #4402); the caller treats expiry as a denial.
-func (c *Controller) approvalWaitContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	if c.approvalTimeout <= 0 {
-		return ctx, func() {}
-	}
-	return context.WithTimeout(ctx, c.approvalTimeout)
-}
-
 // requestApproval emits an ApprovalRequest and blocks until Approve(ID, …)
-// answers or ctx is cancelled. A prior session grant for the same approval scope
-// short-circuits. promptMu serialises outstanding prompts.
+// answers or ctx is cancelled. A prior session grant (or a bypass posture) for
+// the same approval scope short-circuits. The approvalManager's promptMu
+// serialises outstanding prompts; this method keeps the I/O (events, hooks,
+// remember) that the manager deliberately stays out of.
 func (c *Controller) requestApproval(ctx context.Context, tool, subject string, args json.RawMessage) (bool, bool, error) {
-	c.mu.Lock()
 	// YOLO/full access and the just-approved-plan execution window auto-allow
 	// approval-gated tools without prompting. Plan approval is a user decision,
 	// not a tool permission, so it deliberately stays interactive.
-	if c.approvalBypassAllowsLocked(tool) || c.sessionGrantAllowsLocked(tool, subject) {
-		c.mu.Unlock()
+	if c.approval.preApproved(tool, subject) {
 		return true, false, nil
 	}
-	c.mu.Unlock()
 
-	c.promptMu.Lock()
-	defer c.promptMu.Unlock()
+	c.approval.promptMu.Lock()
+	defer c.approval.promptMu.Unlock()
 
-	// Re-check the grant: a session grant may have landed while we queued behind
-	// another prompt for the same subject.
-	c.mu.Lock()
-	if c.approvalBypassAllowsLocked(tool) || c.sessionGrantAllowsLocked(tool, subject) {
-		c.mu.Unlock()
+	// Re-check: a session grant may have landed while we queued behind another
+	// prompt for the same subject.
+	if c.approval.preApproved(tool, subject) {
 		return true, false, nil
 	}
-	c.nextID++
-	id := strconv.Itoa(c.nextID)
-	reply := make(chan approvalReply, 1)
-	c.approvals[id] = pendingApproval{tool: tool, subject: subject, autoDrain: c.autoApprovalWouldAllowLocked(tool, subject), reply: reply}
-	c.mu.Unlock()
+	id, reply := c.approval.register(tool, subject)
 
 	c.sink.Emit(event.Event{Kind: event.ApprovalRequest, Approval: event.Approval{ID: id, Tool: tool, Subject: subject}})
 	if hookSubject, hookArgs, ok := permissionRequestHookPayload(tool, subject, args); ok {
@@ -3537,7 +3395,7 @@ func (c *Controller) requestApproval(ctx context.Context, tool, subject string, 
 	// external channel (desktop notice, phone) while the run blocks on the reply.
 	go c.hooks.Notification(ctx, approvalNotificationText(tool, subject))
 
-	waitCtx, cancelWait := c.approvalWaitContext(ctx)
+	waitCtx, cancelWait := c.approval.waitContext(ctx)
 	defer cancelWait()
 
 	select {
@@ -3545,79 +3403,15 @@ func (c *Controller) requestApproval(ctx context.Context, tool, subject string, 
 		// Plan approvals are one-shot — never persist a session grant for them, or
 		// every future plan would auto-approve.
 		if r.allow && r.session && !requiresFreshApprovalTool(tool) {
-			rule := permission.SessionGrantRuleForScope(tool, subject)
-			c.mu.Lock()
-			c.granted[rule] = true
-			c.mu.Unlock()
+			c.approval.grantSession(tool, subject)
 		}
 		if r.allow && r.persist && !requiresFreshApprovalTool(tool) && c.onRemember != nil {
 			c.emitRememberResult(c.onRemember(permission.RememberRuleForScope(tool, subject)))
 		}
 		return r.allow, false, nil
 	case <-waitCtx.Done():
-		c.mu.Lock()
-		delete(c.approvals, id)
-		c.mu.Unlock()
+		c.approval.cancel(id)
 		return false, false, waitCtx.Err()
-	}
-}
-
-func approvalNotificationText(tool, subject string) string {
-	if requiresFreshApprovalTool(tool) {
-		return "approval needed: " + tool
-	}
-	if subject == "" {
-		return "approval needed: " + tool
-	}
-	return "approval needed: " + tool + " " + subject
-}
-
-func permissionRequestHookPayload(tool, subject string, args json.RawMessage) (string, json.RawMessage, bool) {
-	switch tool {
-	case planApprovalTool:
-		return "", nil, false
-	case memoryRememberTool, memoryForgetTool:
-		return "", nil, true
-	default:
-		return subject, args, true
-	}
-}
-
-func (c *Controller) approvalBypassAllowsLocked(tool string) bool {
-	if requiresFreshApprovalTool(tool) {
-		return false
-	}
-	return c.toolApprovalMode == ToolApprovalYolo ||
-		c.approvedPlanAutoApproveTools
-}
-
-func (c *Controller) autoApprovalWouldAllowLocked(tool, subject string) bool {
-	if requiresFreshApprovalTool(tool) {
-		return false
-	}
-	policy := c.policy
-	policy.Mode = permission.Allow
-	return policy.DecideSubject(tool, false, subject) == permission.Allow
-}
-
-func (c *Controller) sessionGrantAllowsLocked(tool, subject string) bool {
-	if requiresFreshApprovalTool(tool) {
-		return false
-	}
-	for rule := range c.granted {
-		if permission.RuleMatchesString(rule, tool, subject) {
-			return true
-		}
-	}
-	return false
-}
-
-func requiresFreshApprovalTool(tool string) bool {
-	switch tool {
-	case planApprovalTool, memoryRememberTool, memoryForgetTool:
-		return true
-	default:
-		return false
 	}
 }
 
