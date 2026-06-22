@@ -3049,10 +3049,10 @@ func activityStatusForTab(tab *WorkspaceTab) string {
 var legacyMigrationMu sync.Mutex
 
 // topicMigrationMarker, once written into a session dir, records that the
-// pre-topic → Global-topic migration pass completed for that dir, so the
-// per-render ListProjectTree call can skip the full session scan instead of
-// re-reading every .jsonl + sidecar only to find nothing left to migrate. New
-// sessions are born with a TopicID, so no fresh legacy files appear afterwards.
+// pre-topic → Global-topic migration pass completed for that dir. Later
+// ListProjectTree calls can skip the full session decode while the marker is
+// newer than the directory's session files, but a newly-created CLI session
+// invalidates the marker and gets a bounded re-scan.
 // It is stamped only when the pass left nothing deferred (an empty legacy
 // session that could gain content later keeps the dir unmarked), so the gate
 // never hides a session that should still be migrated.
@@ -3063,8 +3063,32 @@ func topicMigrationDone(dir string) bool {
 	if dir == "" {
 		return false
 	}
-	_, err := os.Stat(filepath.Join(dir, topicMigrationMarker))
-	return err == nil
+	markerInfo, err := os.Stat(filepath.Join(dir, topicMigrationMarker))
+	if err != nil {
+		return false
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return true
+	}
+	markerTime := markerInfo.ModTime()
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if filepath.Ext(name) != ".jsonl" && !strings.HasSuffix(name, ".jsonl.meta") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return false
+		}
+		if info.ModTime().After(markerTime) {
+			return false
+		}
+	}
+	return true
 }
 
 func markTopicMigrationDone(dir string) {

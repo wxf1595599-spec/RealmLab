@@ -462,7 +462,7 @@ func TestLegacySessionsMigrateIntoGlobalTopics(t *testing.T) {
 	}
 }
 
-func TestTopicMigrationMarkerGatesRescan(t *testing.T) {
+func TestTopicMigrationMarkerRescansWhenSessionFileChanges(t *testing.T) {
 	isolateDesktopUserDirs(t)
 	dir := config.SessionDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -477,17 +477,17 @@ func TestTopicMigrationMarkerGatesRescan(t *testing.T) {
 		t.Fatalf("expected migration marker after a complete pass: %v", err)
 	}
 
-	// A legacy session added after the marker is left un-migrated: the gate skips
-	// the per-render scan entirely (real new sessions are born with a TopicID, so
-	// no fresh legacy files actually appear after the pass).
+	// A CLI-created session added after the marker invalidates the lightweight
+	// gate and gets a fresh migration pass.
+	time.Sleep(10 * time.Millisecond)
 	second := writeLegacySession(t, dir, "second.jsonl", "second legacy prompt", time.Now())
 	NewApp().ListProjectTree()
 	meta, ok, err := agent.LoadBranchMeta(second)
 	if err != nil {
 		t.Fatalf("load second meta: %v", err)
 	}
-	if ok && strings.TrimSpace(meta.TopicID) != "" {
-		t.Fatalf("marker should have gated re-scan, but second session was migrated: %+v", meta)
+	if !ok || strings.TrimSpace(meta.TopicID) != legacySessionTopicID(second) {
+		t.Fatalf("new session after marker should be migrated, got ok=%v meta=%+v", ok, meta)
 	}
 }
 
@@ -1861,6 +1861,41 @@ func TestProjectTreeMigratesCLISessionFromProjectDir(t *testing.T) {
 	nodes := NewApp().ListProjectTree()
 	if len(nodes) != 1 || nodes[0].Kind != "project" || len(nodes[0].Children) != 1 || nodes[0].Children[0].TopicID != wantTopicID {
 		t.Fatalf("project CLI session should appear in project tree, got %#v; want topic %q", nodes, wantTopicID)
+	}
+}
+
+func TestProjectTreeMigratesNewCLISessionAfterProjectDirMarker(t *testing.T) {
+	isolateDesktopUserDirs(t)
+
+	projectRoot := t.TempDir()
+	if err := addProject(projectRoot, ""); err != nil {
+		t.Fatalf("add project: %v", err)
+	}
+	dir := config.ProjectSessionDir(projectRoot)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	first := writeLegacySession(t, dir, "first-cli-project.jsonl", "first cli project prompt", time.Now().Add(-time.Hour))
+	firstTopicID := legacySessionTopicID(first)
+
+	nodes := NewApp().ListProjectTree()
+	if len(nodes) != 1 || nodes[0].Kind != "project" || len(nodes[0].Children) != 1 || nodes[0].Children[0].TopicID != firstTopicID {
+		t.Fatalf("first project CLI session should appear in project tree, got %#v; want topic %q", nodes, firstTopicID)
+	}
+	if _, err := os.Stat(filepath.Join(dir, topicMigrationMarker)); err != nil {
+		t.Fatalf("expected migration marker after first project pass: %v", err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	second := writeLegacySession(t, dir, "second-cli-project.jsonl", "second cli project prompt", time.Now())
+	secondTopicID := legacySessionTopicID(second)
+
+	nodes = NewApp().ListProjectTree()
+	if len(nodes) != 1 || nodes[0].Kind != "project" || len(nodes[0].Children) != 2 {
+		t.Fatalf("second project CLI session should trigger re-scan, got %#v", nodes)
+	}
+	if nodes[0].Children[0].TopicID != secondTopicID || nodes[0].Children[1].TopicID != firstTopicID {
+		t.Fatalf("project CLI topics = %#v, want newest %q then %q", nodes[0].Children, secondTopicID, firstTopicID)
 	}
 }
 
