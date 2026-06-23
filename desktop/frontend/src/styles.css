@@ -7230,6 +7230,9 @@ a[href] {
   overflow: hidden;
   padding: 0;
 }
+.workspace-panel--embedded .workspace-preview__body--code {
+  padding: 0;
+}
 .workspace-preview__body--code .code-block {
   flex: 1 1 auto;
   min-width: 0;
@@ -21552,6 +21555,10 @@ a[href] {
   background: var(--chat-bg);
   padding: 10px 0 18px;
   scrollbar-color: color-mix(in srgb, var(--fg-faint) 30%, transparent) transparent;
+}
+
+:root[data-theme-style] .workspace-preview__body--code {
+  padding: 0;
 }
 
 :root[data-theme-style] .workspace-preview__body .code,

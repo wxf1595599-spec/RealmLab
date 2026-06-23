@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { JSDOM } from "jsdom";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const styles = readFileSync(resolve(testDir, "../styles.css"), "utf8");
@@ -43,10 +44,29 @@ function finalDeclaration(selector: string, property: string): string | undefine
   return value;
 }
 
+function computedDeclaration(html: string, selector: string, property: string): string {
+  const dom = new JSDOM(html);
+  const style = dom.window.document.createElement("style");
+  style.textContent = styles;
+  dom.window.document.head.append(style);
+  const element = dom.window.document.querySelector(selector);
+  if (!element) throw new Error(`Missing selector in test DOM: ${selector}`);
+  return dom.window.getComputedStyle(element).getPropertyValue(property).trim();
+}
+
 console.log("\nworkspace preview css");
 
 eq(finalDeclaration(".workspace-preview__body--code", "overflow"), "hidden", "code preview body does not create a nested scroller");
 eq(finalDeclaration(".workspace-preview__body--code", "display"), "flex", "code preview body hosts an editor-like viewport");
+eq(
+  computedDeclaration(
+    `<html data-theme-style="default"><head></head><body><aside class="workspace-panel workspace-panel--embedded"><div class="workspace-preview__body workspace-preview__body--code"></div></aside></body></html>`,
+    ".workspace-preview__body--code",
+    "padding",
+  ),
+  "0px",
+  "code preview body keeps zero padding under embedded and themed cascade",
+);
 eq(finalDeclaration(".workspace-preview__body--code .code-block", "display"), "flex", "code block fills the preview viewport");
 eq(finalDeclaration(".workspace-preview__body--code .code", "overflow"), "auto", "code viewport owns horizontal and vertical scrolling");
 eq(finalDeclaration(".workspace-preview__body--code .code", "min-height"), "0", "code viewport can shrink inside the preview pane");
