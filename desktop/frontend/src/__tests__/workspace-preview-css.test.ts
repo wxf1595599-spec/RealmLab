@@ -51,6 +51,12 @@ eq(finalDeclaration(".workspace-preview__body--code .code-block", "display"), "f
 eq(finalDeclaration(".workspace-preview__body--code .code", "overflow"), "auto", "code viewport owns horizontal and vertical scrolling");
 eq(finalDeclaration(".workspace-preview__body--code .code", "min-height"), "0", "code viewport can shrink inside the preview pane");
 eq(finalDeclaration(".workspace-preview__body--code .code", "margin"), "0", "code viewport scrollbar sits at the visible pane bottom");
+eq(
+  finalDeclaration(".workspace-panel--tree-hidden", "grid-template-columns"),
+  "var(--workspace-tree-rail-width) minmax(0, 1fr)",
+  "preview-only mode keeps a narrow tree toggle rail",
+);
+eq(finalDeclaration(".workspace-panel--tree-hidden .workspace-preview", "grid-column"), "2", "preview sits beside the rail");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

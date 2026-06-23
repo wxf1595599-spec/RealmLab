@@ -765,6 +765,7 @@ export function WorkspacePanel({
   const changeDetailActive = changedMode && expandedCommit !== null;
   const previewVisible = changedMode || filePreviewActive;
   const actualTreeVisible = changedMode ? false : treeVisible;
+  const showTreeRail = previewVisible && !actualTreeVisible && !changedMode;
   const previewModeActive = open && (filePreviewActive || changeDetailActive);
   const embeddedDockMode = !showViewTabs;
   const showFileTools = showViewTabs || filePreviewActive;
@@ -814,14 +815,6 @@ export function WorkspacePanel({
     setTreeVisible(true);
     onRequestPanelWidth?.(WORKSPACE_DUAL_PANEL_TARGET_WIDTH);
   }, [onRequestPanelWidth, panelWidth]);
-
-  const toggleFileTree = useCallback(() => {
-    if (actualTreeVisible) {
-      setTreeVisible(false);
-      return;
-    }
-    showTreeEvenSplit();
-  }, [actualTreeVisible, showTreeEvenSplit]);
 
   const closePreviewArea = useCallback(() => {
     if (lastRevealRequestIdRef.current === revealPathRequest?.id) {
@@ -1112,20 +1105,6 @@ export function WorkspacePanel({
           </div>
 
           <div className="workspace-preview__window-actions">
-            {!changedMode && previewVisible && (
-              <Tooltip label={actualTreeVisible ? t("workspace.hideTree") : t("workspace.showTree")}>
-                <button
-                  className={`workspace-tree-toggle${actualTreeVisible ? " workspace-tree-toggle--active" : ""}`}
-                  type="button"
-                  aria-label={actualTreeVisible ? t("workspace.hideTree") : t("workspace.showTree")}
-                  aria-pressed={actualTreeVisible}
-                  onClick={toggleFileTree}
-                >
-                  <FolderTree size={15} />
-                  <span>{t("workspace.treeToggle")}</span>
-                </button>
-              </Tooltip>
-            )}
             <Tooltip label={maximized ? t("workspace.restore") : t("workspace.maximize")}>
               <button className="workspace-iconbtn" onClick={onToggleMaximized}>
                 {maximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -1426,6 +1405,21 @@ export function WorkspacePanel({
           )}
         </div>
       </section>}
+
+      {showTreeRail && (
+        <section className="workspace-tree-rail" aria-label={t("workspace.showTree")}>
+          <Tooltip label={t("workspace.showTree")} side="right">
+            <button
+              className="workspace-tree-reveal workspace-iconbtn workspace-iconbtn--on"
+              type="button"
+              aria-label={t("workspace.showTree")}
+              onClick={showTreeEvenSplit}
+            >
+              <FolderTree size={15} />
+            </button>
+          </Tooltip>
+        </section>
+      )}
 
       {actualTreeVisible && previewVisible && (
         <button

@@ -163,7 +163,6 @@ export const zh: Record<DictKey, string> = {
   "workspace.maximize": "最大化工作区面板",
   "workspace.restore": "还原工作区面板",
   "workspace.resizePanel": "调整工作区面板宽度",
-  "workspace.treeToggle": "文件树",
   "workspace.hideTree": "隐藏文件树",
   "workspace.showTree": "显示文件树",
   "workspace.resizeTree": "调整文件树宽度",

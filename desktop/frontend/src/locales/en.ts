@@ -162,7 +162,6 @@ export const en = {
   "workspace.maximize": "Maximize workspace panel",
   "workspace.restore": "Restore workspace panel",
   "workspace.resizePanel": "Resize workspace panel",
-  "workspace.treeToggle": "File tree",
   "workspace.hideTree": "Hide file tree",
   "workspace.showTree": "Show file tree",
   "workspace.resizeTree": "Resize file tree",
