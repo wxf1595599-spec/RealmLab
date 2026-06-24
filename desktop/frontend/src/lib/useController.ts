@@ -1327,7 +1327,7 @@ export function useController() {
     }
     if (!sessionLoadCurrent(tabId, seq)) return;
     dispatchTo(tabId, { type: "reset" });
-    if (messages.length) dispatchTo(tabId, { type: "history", messages });
+    dispatchTo(tabId, { type: "history", messages });
     dispatchTo(tabId, { type: "hydrate_done" });
     app.ContextUsageForTab(tabId).then((context) => dispatchTo(tabId, { type: "context", context })).catch(() => {});
     void refreshCheckpoints(tabId);
