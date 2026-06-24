@@ -2167,7 +2167,9 @@ export default function App() {
     } else {
       await openProjectTab(workspaceRoot, topicId);
     }
-    await refreshTabMetas();
+    // Fire-and-forget: sidebar/header refresh is not on the critical path;
+    // the conversation data is already loaded inside activateTopic.
+    void refreshTabMetas();
     setTabRevealSignal((signal) => signal + 1);
     setTranscriptRevealSignal((signal) => signal + 1);
   }, [activateTopic, closeTransientOverlays, openGlobalTab, openProjectTab, openTopicSession, refreshTabMetas, singleSurfaceLayout]);
@@ -2255,7 +2257,8 @@ export default function App() {
         if (!isChannelSession(session) && !singleSurfaceLayout) {
           await resumeSession(session.path, targetTab.id);
         }
-        await refreshTabMetas();
+        // Fire-and-forget: data already loaded inside activateTopic.
+        void refreshTabMetas();
         setTabRevealSignal((value) => value + 1);
         setTranscriptRevealSignal((value) => value + 1);
       } catch (err: any) {
