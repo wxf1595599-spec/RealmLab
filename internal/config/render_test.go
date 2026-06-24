@@ -122,6 +122,8 @@ func TestRenderTOMLRoundTrips(t *testing.T) {
 	orig.Agent.RecentKeep = 4
 	orig.Tools.BashTimeoutSeconds = intPtr(900)
 	orig.Tools.BackgroundJobs.StalledWarningSeconds = intPtr(30)
+	orig.Tools.Shell.Prefer = "bash"
+	orig.Tools.Shell.Path = "/usr/local/bin/bash"
 	orig.Permissions = PermissionsConfig{
 		Mode:  "deny",
 		Deny:  []string{"Bash(rm -rf*)"},
@@ -312,6 +314,12 @@ func TestRenderTOMLRoundTrips(t *testing.T) {
 	}
 	if got.Tools.BackgroundJobs.StalledWarningSeconds == nil || *got.Tools.BackgroundJobs.StalledWarningSeconds != 30 {
 		t.Errorf("tools.background_jobs.stalled_warning_seconds = %v, want 30", got.Tools.BackgroundJobs.StalledWarningSeconds)
+	}
+	if got.Tools.Shell.Prefer != "bash" {
+		t.Errorf("tools.shell.prefer = %q, want bash", got.Tools.Shell.Prefer)
+	}
+	if got.Tools.Shell.Path != "/usr/local/bin/bash" {
+		t.Errorf("tools.shell.path = %q, want /usr/local/bin/bash", got.Tools.Shell.Path)
 	}
 	if g, _ := got.Provider("mimo-pro"); g == nil || g.BaseURL != "http://localhost:8000/v1" || g.ReasoningProtocol != "openai" {
 		t.Errorf("mimo-pro base_url not preserved: %+v", g)
@@ -510,7 +518,7 @@ func TestScopedRenderSeparatesUserAndProjectConfig(t *testing.T) {
 	c.Desktop.CheckUpdates = boolPtr(false)
 
 	user := RenderTOMLForScope(c, RenderScopeUser)
-	for _, want := range []string{"config_version = 3", "[desktop]", `theme = "dark"`, `close_behavior = "background"`, `status_bar_style = "text"`, `check_updates = false`, "[notifications]"} {
+	for _, want := range []string{"config_version = 3", "[desktop]", `theme = "dark"`, `close_behavior = "background"`, `status_bar_style = "text"`, `check_updates = false`, "[notifications]", "[tools.shell]"} {
 		if !strings.Contains(user, want) {
 			t.Fatalf("user render missing %q:\n%s", want, user)
 		}
@@ -527,6 +535,30 @@ func TestScopedRenderSeparatesUserAndProjectConfig(t *testing.T) {
 	}
 	if !strings.Contains(project, "# system_prompt =") {
 		t.Fatalf("project render should leave a system prompt hint:\n%s", project)
+	}
+}
+
+func TestProjectDeltaRendersToolsShellOverrides(t *testing.T) {
+	c := Default()
+	c.Tools.Shell.Prefer = "bash"
+	c.Tools.Shell.Path = "/usr/local/bin/bash"
+
+	delta := RenderTOMLProjectDelta(c)
+	for _, want := range []string{"[tools.shell]", `prefer = "bash"`, `path = "/usr/local/bin/bash"`} {
+		if !strings.Contains(delta, want) {
+			t.Fatalf("project delta missing %q:\n%s", want, delta)
+		}
+	}
+	if strings.Contains(delta, "[tools]\n\n") {
+		t.Fatalf("project delta should not emit an empty [tools] block:\n%s", delta)
+	}
+
+	got := Default()
+	if _, err := toml.Decode(delta, got); err != nil {
+		t.Fatalf("decode project delta: %v\n%s", err, delta)
+	}
+	if got.Tools.Shell.Prefer != "bash" || got.Tools.Shell.Path != "/usr/local/bin/bash" {
+		t.Fatalf("tools.shell = %+v, want bash with path", got.Tools.Shell)
 	}
 }
 
