@@ -100,7 +100,7 @@ func bashCommandArgs(t *testing.T, cmd string) json.RawMessage {
 func TestPlanModeDeniedToolsBlocked(t *testing.T) {
 	denied := []string{
 		"write_file", "edit_file", "multi_edit", "move_file", "apply_patch",
-		"edit_notebook", "range_delete", "symbol_delete",
+		"edit_notebook", "notebook_edit", "range_delete", "symbol_delete", "delete_range", "delete_symbol",
 		"complete_step", "task", "parallel_tasks", "run_skill",
 		"install_source", "install_skill", "remember", "forget", "kill_shell",
 	}
