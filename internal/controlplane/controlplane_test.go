@@ -83,12 +83,17 @@ func TestDistributedControlAppliesGlobalEquilibriumWindow(t *testing.T) {
 		{Action: controlgraph.ActionExplore, ExplorationRatePercent: 12, Gain: 1.1},
 		{Action: controlgraph.ActionDampen, ExplorationRatePercent: 3, Gain: 0.6},
 	}
-	decision := DecideWithHistory(controlgraph.SystemState{Stable: true, RecentSuccesses: 4}, history)
-	if decision.Action != controlgraph.ActionDampen {
-		t.Fatalf("global equilibrium should damp oscillating policy window, got %+v", decision)
+	st := controlgraph.SystemState{Stable: true, RecentSuccesses: 4}
+	base := DecideWithHistory(st, nil)
+	decision := DecideWithHistory(st, history)
+	if decision.Action != base.Action {
+		t.Fatalf("global equilibrium must preserve control action: base=%+v got=%+v", base, decision)
 	}
 	if decision.EquilibriumState != "damping" {
 		t.Fatalf("equilibrium state = %q, want damping: %+v", decision.EquilibriumState, decision)
+	}
+	if decision.Gain >= base.Gain && base.Gain > 0 {
+		t.Fatalf("global equilibrium should damp gain without overriding action: base=%+v got=%+v", base, decision)
 	}
 	if decision.OscillationIndex < 0.7 {
 		t.Fatalf("oscillation index = %.3f, want high", decision.OscillationIndex)

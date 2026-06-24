@@ -520,9 +520,16 @@ func TestControlPolicyIncludesGlobalEquilibriumTrace(t *testing.T) {
 		{Mode: "explore", ExplorationRatePercent: maxExplorationRatePercent, Gain: 1.1},
 		{Mode: "dampen", ExplorationRatePercent: minExplorationRatePercent, Gain: 0.6},
 	}}
+	base := controlPolicyForState(state{}, DriftReport{})
 	policy := controlPolicyForState(st, DriftReport{})
 	if policy.EquilibriumState != "damping" {
 		t.Fatalf("equilibrium state = %q, want damping: %+v", policy.EquilibriumState, policy)
+	}
+	if policy.Mode != base.Mode {
+		t.Fatalf("equilibrium must not override control mode: base=%+v got=%+v", base, policy)
+	}
+	if policy.Gain >= base.Gain && base.Gain > 0 {
+		t.Fatalf("equilibrium should damp control gain without changing mode: base=%+v got=%+v", base, policy)
 	}
 	if policy.OscillationIndex < 0.7 {
 		t.Fatalf("oscillation index = %.3f, want high", policy.OscillationIndex)

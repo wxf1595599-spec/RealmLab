@@ -1,6 +1,9 @@
 package globalstate
 
-import controlgraph "reasonix/internal/controlplane/control_graph"
+import (
+	controlgraph "reasonix/internal/controlplane/control_graph"
+	controltypes "reasonix/internal/controlsemantics/types"
+)
 
 type DecisionSample struct {
 	Action                 controlgraph.Action
@@ -40,5 +43,6 @@ type EquilibriumTrace struct {
 	State             GlobalEquilibriumState
 	Policy            EquilibriumPolicy
 	OscillationReport OscillationReport
+	SemanticSignals   []controltypes.TypedSignal
 	Adjustments       []string
 }

@@ -7,6 +7,8 @@ import (
 	controlgraph "reasonix/internal/controlplane/control_graph"
 	"reasonix/internal/controlplane/controllers"
 	policynodes "reasonix/internal/controlplane/policy_nodes"
+	semanticrouter "reasonix/internal/controlsemantics/semantic_router"
+	controltypes "reasonix/internal/controlsemantics/types"
 	"reasonix/internal/equilibrium/convergence"
 	globalstate "reasonix/internal/equilibrium/global_state"
 )
@@ -34,6 +36,17 @@ func DecideWithGraphAndHistory(st controlgraph.SystemState, graph controlgraph.C
 	graph = policynodes.ApplyDynamicWeights(graph, st)
 	signals := CollectSignals(graph, st)
 	decision := arbitration.Arbitrate(graph, st, signals)
+	if _, err := semanticrouter.Route(controltypes.NewSignal(controltypes.SignalDecision, controltypes.LayerControl, decision.Action, "control plane arbitration")); err != nil {
+		return controlgraph.ControlDecision{
+			Action:                 controlgraph.ActionSafeMode,
+			Confidence:             1,
+			ExplorationRatePercent: controlgraph.MinExplorationRatePercent,
+			Gain:                   0.5,
+			Controller:             "distributed-control-plane",
+			Reasons:                []string{err.Error()},
+			SafeMode:               true,
+		}
+	}
 	decision, _ = convergence.FilterDecision(decision, history)
 	return decision
 }

@@ -30,7 +30,7 @@ const (
 	learningTracesFile = "learning_traces.jsonl"
 	debugTracesFile    = "debug_traces.jsonl"
 	debugTraceEnv      = "REASONIX_MEMORY_COMPILER_DEBUG_TRACE"
-	version            = "v5.7"
+	version            = "v5.8"
 
 	explorationRatePercent    = 10
 	minExplorationRatePercent = 3

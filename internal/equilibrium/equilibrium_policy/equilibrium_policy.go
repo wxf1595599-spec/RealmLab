@@ -25,28 +25,28 @@ func ForState(st globalstate.GlobalEquilibriumState, report globalstate.Oscillat
 		policy.ExplorationRatePercent = controlgraph.MinExplorationRatePercent
 		policy.DampingFactor = 0.55
 		policy.ConsensusThreshold = StabilizedConsensusThreshold
-		policy.Actions = []string{"enforce global damping"}
+		policy.Actions = []string{"apply global damping constraint"}
 		return policy
 	}
 	if st.ControlGraphEntropy < EntropyFloor {
 		policy.ExplorationRatePercent = controlgraph.MaxExplorationRatePercent
 		policy.DampingFactor = 0.82
 		policy.ConsensusThreshold = StabilizedConsensusThreshold
-		policy.Actions = []string{"enforce entropy floor"}
+		policy.Actions = []string{"enforce entropy floor weight"}
 		return policy
 	}
 	if st.WindowSize >= 4 && st.ConvergenceVelocity < LowConvergenceVelocity && st.SystemStabilityScore >= StableConvergenceThreshold && st.OscillationIndex < 0.25 {
 		policy.ExplorationRatePercent = controlgraph.MaxExplorationRatePercent
 		policy.DampingFactor = 1.05
 		policy.ConsensusThreshold = DefaultConsensusThreshold
-		policy.Actions = []string{"increase exploration entropy"}
+		policy.Actions = []string{"increase exploration weight"}
 		return policy
 	}
 	if report.Severity == "medium" || st.OscillationIndex >= 0.45 {
 		policy.ExplorationRatePercent = controlgraph.MinExplorationRatePercent
 		policy.DampingFactor = 0.72
 		policy.ConsensusThreshold = StabilizedConsensusThreshold
-		policy.Actions = []string{"dampen emerging oscillation"}
+		policy.Actions = []string{"apply emerging oscillation constraint"}
 	}
 	return policy
 }
