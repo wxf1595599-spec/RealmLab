@@ -138,6 +138,32 @@ func TestServeResumeRejectsCleanupPending(t *testing.T) {
 	}
 }
 
+func TestServeRejectsUnknownAuthMode(t *testing.T) {
+	isolateCLIConfigHome(t)
+
+	errOut := captureStderr(t, func() {
+		if rc := runServe([]string{"--auth", "tokne", "--addr", "127.0.0.1:0"}); rc != 1 {
+			t.Fatalf("serve --auth tokne rc = %d, want 1", rc)
+		}
+	})
+	if !strings.Contains(errOut, "auth mode must be none, token, or password") {
+		t.Fatalf("serve --auth tokne stderr = %q, want auth mode validation", errOut)
+	}
+}
+
+func TestServePasswordAuthRequiresPasswordMaterial(t *testing.T) {
+	isolateCLIConfigHome(t)
+
+	errOut := captureStderr(t, func() {
+		if rc := runServe([]string{"--auth", "password", "--addr", "127.0.0.1:0"}); rc != 1 {
+			t.Fatalf("serve --auth password without password rc = %d, want 1", rc)
+		}
+	})
+	if !strings.Contains(errOut, "auth mode password requires --password or serve.password_hash") {
+		t.Fatalf("serve --auth password stderr = %q, want password material validation", errOut)
+	}
+}
+
 func TestReserveNativeScrollbackFrameWritesOnlyNewlines(t *testing.T) {
 	var b bytes.Buffer
 	reserveNativeScrollbackFrame(&b, 3)
@@ -469,6 +495,48 @@ func TestConfigAutoPlanLocalIsRejected(t *testing.T) {
 	}
 	if cfg.Agent.AutoPlan != "off" {
 		t.Fatalf("auto_plan = %q, want global off", cfg.Agent.AutoPlan)
+	}
+}
+
+func TestConfigMemoryV5CommandWritesUserConfig(t *testing.T) {
+	isolateCLIConfigHome(t)
+
+	out := captureStdout(t, func() {
+		if rc := Run([]string{"config", "memory-v5", "off"}, "test-version"); rc != 0 {
+			t.Fatalf("config memory-v5 rc = %d, want 0", rc)
+		}
+	})
+	if !strings.Contains(out, "memory_compiler.enabled = false") {
+		t.Fatalf("config memory-v5 output = %q", out)
+	}
+	cfg := config.LoadForEdit(config.UserConfigPath())
+	if cfg.MemoryCompilerEnabled() {
+		t.Fatalf("saved memory_compiler.enabled = true, want false")
+	}
+
+	out = captureStdout(t, func() {
+		if rc := Run([]string{"config", "memory-v5", "status"}, "test-version"); rc != 0 {
+			t.Fatalf("config memory-v5 status rc = %d, want 0", rc)
+		}
+	})
+	if !strings.Contains(out, "memory_compiler.enabled = false") {
+		t.Fatalf("config memory-v5 status output = %q", out)
+	}
+}
+
+func TestConfigMemoryV5LocalIsRejected(t *testing.T) {
+	isolateCLIConfigHome(t)
+
+	errOut := captureStderr(t, func() {
+		if rc := Run([]string{"config", "memory-v5", "--local", "off"}, "test-version"); rc != 2 {
+			t.Fatalf("config memory-v5 --local rc = %d, want 2", rc)
+		}
+	})
+	if !strings.Contains(errOut, "--local is not supported") {
+		t.Fatalf("config memory-v5 --local stderr = %q", errOut)
+	}
+	if _, err := os.Stat("reasonix.toml"); !os.IsNotExist(err) {
+		t.Fatalf("reasonix.toml should not be written, stat err=%v", err)
 	}
 }
 
