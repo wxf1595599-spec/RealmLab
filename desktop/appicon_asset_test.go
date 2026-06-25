@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestAppIconPNGUsesBlueFullCanvasRoundedBackground(t *testing.T) {
+func TestAppIconPNGUsesRealmLabLogoArtwork(t *testing.T) {
 	f, err := os.Open("build/appicon.png")
 	if err != nil {
 		t.Fatal(err)
@@ -23,19 +23,19 @@ func TestAppIconPNGUsesBlueFullCanvasRoundedBackground(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertFullCanvasRoundedIcon(t, img, 1024)
+	assertRealmLabLogoIcon(t, img, 1024)
 }
 
-func TestWindowsICOUsesBlueFullCanvasRoundedBackground(t *testing.T) {
+func TestWindowsICOUsesRealmLabLogoArtwork(t *testing.T) {
 	for _, size := range []int{16, 24, 32, 48, 64, 256} {
 		t.Run(fmt.Sprintf("%dx%d", size, size), func(t *testing.T) {
 			img := decodeICOImage(t, "build/windows/icon.ico", size)
-			assertFullCanvasRoundedIcon(t, img, size)
+			assertRealmLabLogoIcon(t, img, size)
 		})
 	}
 }
 
-func assertFullCanvasRoundedIcon(t *testing.T, img image.Image, size int) {
+func assertRealmLabLogoIcon(t *testing.T, img image.Image, size int) {
 	t.Helper()
 
 	bounds := img.Bounds()
@@ -43,7 +43,7 @@ func assertFullCanvasRoundedIcon(t *testing.T, img image.Image, size int) {
 		t.Fatalf("app icon must be square, got %dx%d", bounds.Dx(), bounds.Dy())
 	}
 
-	corners := []struct {
+	darkCanvasPoints := []struct {
 		name string
 		x    int
 		y    int
@@ -52,53 +52,94 @@ func assertFullCanvasRoundedIcon(t *testing.T, img image.Image, size int) {
 		{"top-right", bounds.Max.X - 1, bounds.Min.Y},
 		{"bottom-left", bounds.Min.X, bounds.Max.Y - 1},
 		{"bottom-right", bounds.Max.X - 1, bounds.Max.Y - 1},
-	}
-	for _, corner := range corners {
-		_, _, _, a := img.At(corner.x, corner.y).RGBA()
-		if a > 0xff {
-			t.Fatalf("%s corner must be transparent, alpha=%d", corner.name, a)
-		}
-	}
-
-	_, _, _, centerAlpha := img.At(bounds.Min.X+bounds.Dx()/2, bounds.Min.Y+bounds.Dy()/2).RGBA()
-	if centerAlpha == 0 {
-		t.Fatal("app icon center must contain visible artwork")
-	}
-
-	edgePoints := []struct {
-		name string
-		x    int
-		y    int
-	}{
 		{"top", bounds.Min.X + bounds.Dx()/2, bounds.Min.Y},
 		{"right", bounds.Max.X - 1, bounds.Min.Y + bounds.Dy()/2},
 		{"bottom", bounds.Min.X + bounds.Dx()/2, bounds.Max.Y - 1},
 		{"left", bounds.Min.X, bounds.Min.Y + bounds.Dy()/2},
 	}
-	for _, point := range edgePoints {
-		_, _, _, a := img.At(point.x, point.y).RGBA()
-		if a == 0 {
-			t.Fatalf("%s edge must contain visible rounded-rect background", point.name)
+	for _, point := range darkCanvasPoints {
+		if !isDarkOpaque(img.At(point.x, point.y)) {
+			t.Fatalf("%s point must use RealmLab dark icon canvas, got %s", point.name, hexColor(img.At(point.x, point.y)))
 		}
-		assertReasonixBlue(t, point.name, img.At(point.x, point.y))
+	}
+
+	orangePixels := countPixels(img, isRealmLabOrange)
+	if orangePixels < minArtworkPixels(size, 9000) {
+		t.Fatalf("app icon must contain the orange RealmLab cube, found %d matching pixels", orangePixels)
+	}
+
+	platformPixels := countPixels(img, isSilverPlatform)
+	if platformPixels < minArtworkPixels(size, 6000) {
+		t.Fatalf("app icon must contain the silver RealmLab platform, found %d matching pixels", platformPixels)
 	}
 }
 
-func assertReasonixBlue(t *testing.T, name string, colorValue color.Color) {
-	t.Helper()
-
-	r16, g16, b16, _ := colorValue.RGBA()
-	r, g, b := uint8(r16>>8), uint8(g16>>8), uint8(b16>>8)
-	if !near(r, 0x01, 2) || !near(g, 0x53, 2) || !near(b, 0xe5, 2) {
-		t.Fatalf("%s edge must use Reasonix blue background, got #%02x%02x%02x", name, r, g, b)
-	}
+func isDarkOpaque(colorValue color.Color) bool {
+	r, g, b, a := rgba8(colorValue)
+	return a >= 0xf0 && r <= 45 && g <= 45 && b <= 45
 }
 
-func near(got, want uint8, tolerance uint8) bool {
-	if got > want {
-		return got-want <= tolerance
+func isRealmLabOrange(colorValue color.Color) bool {
+	r, g, b, a := rgba8(colorValue)
+	return a >= 0xf0 && r >= 180 && g >= 70 && g <= 190 && b <= 120 && r > g+25
+}
+
+func isSilverPlatform(colorValue color.Color) bool {
+	r, g, b, a := rgba8(colorValue)
+	maxChannel := max3(r, g, b)
+	minChannel := min3(r, g, b)
+	return a >= 0xf0 && r >= 145 && g >= 145 && b >= 135 && maxChannel-minChannel <= 70
+}
+
+func rgba8(colorValue color.Color) (uint8, uint8, uint8, uint8) {
+	r16, g16, b16, a16 := colorValue.RGBA()
+	return uint8(r16 >> 8), uint8(g16 >> 8), uint8(b16 >> 8), uint8(a16 >> 8)
+}
+
+func hexColor(colorValue color.Color) string {
+	r, g, b, a := rgba8(colorValue)
+	return fmt.Sprintf("#%02x%02x%02x/%02x", r, g, b, a)
+}
+
+func countPixels(img image.Image, match func(color.Color) bool) int {
+	bounds := img.Bounds()
+	count := 0
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			if match(img.At(x, y)) {
+				count++
+			}
+		}
 	}
-	return want-got <= tolerance
+	return count
+}
+
+func minArtworkPixels(size int, divisor int) int {
+	pixels := (size * size) / divisor
+	if pixels < 1 {
+		return 1
+	}
+	return pixels
+}
+
+func max3(a, b, c uint8) uint8 {
+	if b > a {
+		a = b
+	}
+	if c > a {
+		a = c
+	}
+	return a
+}
+
+func min3(a, b, c uint8) uint8 {
+	if b < a {
+		a = b
+	}
+	if c < a {
+		a = c
+	}
+	return a
 }
 
 func decodeICOImage(t *testing.T, path string, size int) image.Image {
