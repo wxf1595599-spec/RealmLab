@@ -180,8 +180,8 @@ func TestDesktopLayoutStyleNormalizes(t *testing.T) {
 	if got := c.DesktopLayoutStyle(); got != "workbench" {
 		t.Fatalf("legacy desktop theme_style=workbench layout = %q, want workbench", got)
 	}
-	if got := c.DesktopThemeStyle(); got != "" {
-		t.Fatalf("legacy desktop theme_style=workbench theme style = %q, want empty", got)
+	if got := c.DesktopThemeStyle(); got != RealmLabDefaultDesktopThemeStyle {
+		t.Fatalf("legacy desktop theme_style=workbench theme style = %q, want %s", got, RealmLabDefaultDesktopThemeStyle)
 	}
 }
 

@@ -23,6 +23,8 @@ These changes are product decisions and must survive every upstream merge:
 
 - Desktop product name and bundle identity stay `RealmLab`.
 - Desktop output bundle stays `RealmLab.app` for local/user-facing builds.
+- Default desktop appearance stays `auto` theme + `graphite` visual style. This
+  is RealmLab's current palette and must remain the first-run/package default.
 - CLI build output stays `bin/realmlab` unless a dedicated rename plan changes
   it.
 - The Go module path may remain `reasonix` until a dedicated import migration is
@@ -130,6 +132,10 @@ open .local-app/RealmLab.app
   - `desktop/main.go`
   - `internal/config/config.go`
   - local `.local-app/RealmLab.app`
+- RealmLab default appearance is still `auto` + `graphite` in:
+  - `internal/config/config.go`
+  - `desktop/frontend/src/lib/theme.ts`
+  - `reasonix.example.toml`
 - The sync result does not introduce product reliance on the browser `serve`
   frontend, `site/`, or `workers/`.
 

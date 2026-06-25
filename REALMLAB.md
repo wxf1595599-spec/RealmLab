@@ -21,6 +21,7 @@ migration after the first RealmLab product requirements are clear.
 - Cross-platform CLI artifacts: `dist/realmlab-<os>-<arch>`
 - Desktop Wails product name: `RealmLab`
 - Desktop output filename: `RealmLab`
+- Default desktop appearance: `auto` theme with `graphite` visual style
 
 ## Build Targets
 

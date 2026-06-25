@@ -23,11 +23,11 @@ func TestDefaultMemoryCompilerEnabled(t *testing.T) {
 
 func TestDefaultDesktopAppearanceAutoGraphite(t *testing.T) {
 	cfg := Default()
-	if got := cfg.DesktopTheme(); got != "auto" {
-		t.Fatalf("default desktop theme = %q, want auto", got)
+	if got := cfg.DesktopTheme(); got != RealmLabDefaultDesktopTheme {
+		t.Fatalf("default desktop theme = %q, want %s", got, RealmLabDefaultDesktopTheme)
 	}
-	if got := cfg.DesktopThemeStyle(); got != "" {
-		t.Fatalf("default desktop theme style = %q, want empty so frontend resolves graphite", got)
+	if got := cfg.DesktopThemeStyle(); got != RealmLabDefaultDesktopThemeStyle {
+		t.Fatalf("default desktop theme style = %q, want %s", got, RealmLabDefaultDesktopThemeStyle)
 	}
 }
 

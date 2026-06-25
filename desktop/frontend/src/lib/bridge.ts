@@ -11,6 +11,7 @@ import { addBreadcrumb } from "./breadcrumbs";
 import { t } from "./i18n";
 import { providerRequiresKey } from "./providerModels";
 import { DEFAULT_STATUS_BAR_ITEMS, normalizeStatusBarItems } from "./statusBarItems";
+import { REALMLAB_DEFAULT_THEME, REALMLAB_DEFAULT_THEME_STYLE } from "./theme";
 import { modeWithAutoApproveTools, modeWithPlan, normalizeCollaborationMode, normalizeMode, normalizeTokenMode, normalizeToolApprovalMode } from "./types";
 
 import type {
@@ -907,8 +908,8 @@ function makeMockApp(): AppBindings {
     },
     desktopLanguage: "",
     desktopLayoutStyle: "workbench",
-    desktopTheme: "auto",
-    desktopThemeStyle: "graphite",
+    desktopTheme: REALMLAB_DEFAULT_THEME,
+    desktopThemeStyle: REALMLAB_DEFAULT_THEME_STYLE,
     closeBehavior: "background",
     displayMode: "compact",
     statusBarStyle: "text",

@@ -71,6 +71,13 @@ const (
 	providerSourceProject providerSourceScope = "project"
 )
 
+// RealmLab desktop appearance defaults are product identity, not incidental UI
+// fallbacks. Keep these in sync with desktop/frontend/src/lib/theme.ts.
+const (
+	RealmLabDefaultDesktopTheme      = "auto"
+	RealmLabDefaultDesktopThemeStyle = "graphite"
+)
+
 // UIConfig controls CLI presentation-only settings. Desktop appearance is kept in
 // DesktopConfig so desktop preferences cannot alter terminal output or prompts.
 type UIConfig struct {
@@ -194,14 +201,17 @@ func (c *Config) DesktopTheme() string {
 	case "dark":
 		return "dark"
 	default:
-		return "auto"
+		return RealmLabDefaultDesktopTheme
 	}
 }
 
-// DesktopThemeStyle normalizes desktop.theme_style. Empty means the frontend
-// chooses the default style for the resolved desktop theme.
+// DesktopThemeStyle normalizes desktop.theme_style. Empty resolves to RealmLab's
+// product default so packaged apps and upstream syncs keep the same palette.
 func (c *Config) DesktopThemeStyle() string {
-	return normalizeThemeStyle(c.Desktop.ThemeStyle)
+	if style := normalizeThemeStyle(c.Desktop.ThemeStyle); style != "" {
+		return style
+	}
+	return RealmLabDefaultDesktopThemeStyle
 }
 
 // DesktopLayoutStyle normalizes the desktop layout style. New installs default
@@ -1183,6 +1193,10 @@ func Default() *Config {
 		DefaultModel:     "deepseek-flash",
 		CredentialsStore: CredentialsStoreAuto,
 		UI:               UIConfig{Theme: "auto"},
+		Desktop: DesktopConfig{
+			Theme:      RealmLabDefaultDesktopTheme,
+			ThemeStyle: RealmLabDefaultDesktopThemeStyle,
+		},
 		Notifications: NotificationsConfig{
 			Enabled:         false,
 			TurnDone:        true,
