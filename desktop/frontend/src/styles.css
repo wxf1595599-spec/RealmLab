@@ -3445,8 +3445,8 @@ a[href] {
 }
 
 .welcome {
-  --welcome-brand-width: 500px;
-  --welcome-brand-height: 74px;
+  --welcome-brand-width: 366px;
+  --welcome-brand-height: 86px;
   --welcome-brand-gap: 28px;
   width: min(100%, 600px);
   max-height: none;
@@ -3550,8 +3550,8 @@ a[href] {
 
 @container (max-height: 560px) {
   .welcome--brand {
-    --welcome-brand-width: 420px;
-    --welcome-brand-height: 62px;
+    --welcome-brand-width: 318px;
+    --welcome-brand-height: 74px;
     --welcome-brand-gap: 22px;
     transform: translateY(-16px);
   }
@@ -19264,7 +19264,7 @@ a[href] {
 .sidebar__brand-logo {
   flex: 0 0 auto;
   display: block;
-  width: 226px;
+  width: 250px;
   height: 36px;
   margin-left: -8px;
   object-fit: contain;
@@ -22247,7 +22247,7 @@ a[href] {
 }
 
 .sidebar--workbench .sidebar__brand-logo--workbench {
-  width: 198px;
+  width: 218px;
   height: 32px;
   margin-left: -6px;
 }
@@ -24210,7 +24210,7 @@ a[href] {
 
 .app--creation .sidebar__brand-logo,
 :root[data-theme-style] .app--creation .sidebar__brand-logo {
-  width: 198px;
+  width: 218px;
   height: 32px;
   margin-left: -6px;
 }
