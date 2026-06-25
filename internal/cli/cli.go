@@ -402,13 +402,66 @@ func runServe(args []string) int {
 	maxSteps := fs.Int("max-steps", 0, "max tool-call rounds (0 = use config/default)")
 	addr := fs.String("addr", "127.0.0.1:8787", "listen address")
 	resume := fs.String("resume", "", "resume a saved session file")
+	auth := fs.String("auth", "", "auth mode: none, token, or password (default: none)")
+	token := fs.String("token", "", "pre-shared token for auth=token (auto-generated if empty)")
+	password := fs.String("password", "", "password for auth=password (use --hash-password to store a hash instead)")
+	hashPassword := fs.Bool("hash-password", false, "print a bcrypt hash of --password and exit")
+	behindProxy := fs.Bool("behind-proxy", false, "trust X-Forwarded-For / X-Forwarded-Proto headers from a reverse proxy")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+
+	// --hash-password: generate a bcrypt hash and exit.
+	if *hashPassword {
+		if *password == "" {
+			fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, "--hash-password requires --password")
+			return 1
+		}
+		h, err := serve.HashPassword(*password)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
+			return 1
+		}
+		fmt.Println(h)
+		return 0
 	}
 
 	ctx := context.Background()
 	bc := serve.NewBroadcaster()
 	cfg, _ := config.Load()
+
+	// Build serve config, merging CLI flags over config file.
+	serveCfg := cfg.Serve
+	if *auth != "" {
+		serveCfg.AuthMode = *auth
+	}
+	if *token != "" {
+		serveCfg.Token = *token
+	}
+	if *behindProxy {
+		serveCfg.BehindProxy = true
+	}
+	mode, err := serve.NormalizeAuthMode(serveCfg.AuthMode)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
+		return 1
+	}
+	serveCfg.AuthMode = mode
+	if *password != "" && serveCfg.AuthMode == "password" {
+		// Hash the password at startup so the config never stores plaintext.
+		// If a PasswordHash is already set in config, the CLI password overrides it.
+		h, err := serve.HashPassword(*password)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, "failed to hash password:", err)
+			return 1
+		}
+		serveCfg.PasswordHash = h
+	}
+	if serveCfg.AuthMode == "password" && strings.TrimSpace(serveCfg.PasswordHash) == "" {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, "auth mode password requires --password or serve.password_hash")
+		return 1
+	}
+
 	var resumeSession *agent.Session
 	if *resume != "" {
 		var err error
@@ -419,6 +472,16 @@ func runServe(args []string) int {
 		}
 	}
 	*model = modelForResumePath(*model, *resume, cfg)
+	// Serve always uses the user's global default_model, ignoring any
+	// project-level override, so the model choice stays consistent across
+	// projects and matches the user's account-level preference.
+	if *model == "" {
+		if uc := config.UserConfigPath(); uc != "" {
+			if userCfg := config.LoadForEdit(uc); userCfg != nil && userCfg.DefaultModel != "" {
+				*model = userCfg.DefaultModel
+			}
+		}
+	}
 	ctrl, err := setup(ctx, *model, *maxSteps, true, bc)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
@@ -429,15 +492,30 @@ func runServe(args []string) int {
 	// Auto-save target: reuse the resumed file, else a fresh one — same as chat.
 	if *resume != "" {
 		ctrl.Resume(resumeSession, *resume)
-	} else if ctrl.SessionDir() != "" {
-		ctrl.SetSessionPath(agent.NewSessionPath(ctrl.SessionDir(), ctrl.Label()))
+	}
+	ctrl.EnsureSessionPath()
+
+	srv := serve.New(ctrl, bc, serveCfg)
+	fmt.Printf("reasonix serve — %s on http://%s\n", ctrl.Label(), *addr)
+	if srv.AuthMode() == "token" {
+		fmt.Printf("  auth: token\n")
+		fmt.Printf("  share: http://%s/?token=%s\n", *addr, srv.AuthToken())
+	} else if srv.AuthMode() == "password" {
+		fmt.Printf("  auth: password (login at http://%s/login)\n", *addr)
+	}
+	// Diagnostic: check whether balance endpoint is reachable
+	if b, err := ctrl.Balance(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "  balance: error — %v\n", err)
+	} else if b == nil {
+		fmt.Fprintf(os.Stderr, "  balance: not configured (no balance_url for this provider)\n")
+	} else {
+		fmt.Printf("  balance: %s\n", b.Display())
 	}
 
-	fmt.Printf("reasonix serve — %s on http://%s\n", ctrl.Label(), *addr)
 	// Use graceful shutdown so SIGINT/SIGTERM drain active connections.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := serve.New(ctrl, bc).RunGraceful(ctx, *addr); err != nil {
+	if err := srv.RunGraceful(ctx, *addr); err != nil {
 		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
 		return 1
 	}
@@ -518,15 +596,14 @@ func chatREPL(args []string) int {
 	// file so closing/reopening keeps appending to the same history; a fresh
 	// session lands in a new file stamped with the model name.
 	if resumePath != "" {
-		if loaded, err := agent.LoadSession(resumePath); err != nil {
+		loaded, err := agent.LoadSession(resumePath)
+		if err != nil {
 			fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
 			return 1
-		} else {
-			ctrl.Resume(loaded, resumePath)
 		}
-	} else if ctrl.SessionDir() != "" {
-		ctrl.SetSessionPath(agent.NewSessionPath(ctrl.SessionDir(), ctrl.Label()))
+		ctrl.Resume(loaded, resumePath)
 	}
+	ctrl.EnsureSessionPath()
 
 	// Surface a missing-key warning inside the TUI banner so the first message
 	// failing is at least pre-announced; the user can still enter chat.
@@ -578,11 +655,7 @@ func chatREPL(args []string) int {
 		// Keep the carried conversation in its existing file so the switch doesn't
 		// orphan a duplicate (#2807).
 		path := agent.ContinueSessionPath(resumePath, c.SessionDir(), c.Label())
-		if len(carry) > 0 {
-			c.Resume(&agent.Session{Messages: carry}, path)
-		} else if path != "" {
-			c.SetSessionPath(path)
-		}
+		c.AdoptHistory(carry, path)
 		c.EnableInteractiveApproval()
 		if *yolo {
 			c.SetAutoApproveTools(true)
@@ -1661,6 +1734,8 @@ func configCommand(args []string) int {
 	switch args[0] {
 	case "auto-plan":
 		return configAutoPlanCommand(args[1:])
+	case "memory-v5":
+		return configMemoryV5Command(args[1:])
 	case "reasoning-language":
 		return configReasoningLanguageCommand(args[1:])
 	default:
@@ -1710,6 +1785,53 @@ func configAutoPlanCommand(args []string) int {
 		return 1
 	}
 	fmt.Printf("auto_plan = %q (%s)\n", cfg.Agent.AutoPlan, displayPath(path))
+	return 0
+}
+
+func configMemoryV5Command(args []string) int {
+	fs := flag.NewFlagSet("config memory-v5", flag.ContinueOnError)
+	local := fs.Bool("local", false, "unsupported; Memory v5 is user-level only")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *local {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, "memory-v5 is user-level only; --local is not supported")
+		return 2
+	}
+	rest := fs.Args()
+	if len(rest) > 1 {
+		configMemoryV5Usage()
+		return 2
+	}
+	if len(rest) == 0 || strings.EqualFold(rest[0], "status") {
+		cfg, err := config.Load()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
+			return 1
+		}
+		fmt.Printf("memory_compiler.enabled = %v\n", cfg.MemoryCompilerEnabled())
+		return 0
+	}
+	enabled, err := parseCLIMemoryV5Mode(rest[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
+		return 2
+	}
+	path := config.UserConfigPath()
+	if path == "" {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, "cannot resolve config path")
+		return 1
+	}
+	cfg := config.LoadForEdit(path)
+	if err := cfg.SetMemoryCompilerEnabled(enabled); err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
+		return 2
+	}
+	if err := cfg.SaveTo(path); err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
+		return 1
+	}
+	fmt.Printf("memory_compiler.enabled = %v (%s)\n", cfg.MemoryCompilerEnabled(), displayPath(path))
 	return 0
 }
 
@@ -1776,6 +1898,7 @@ func configReasoningLanguageCommand(args []string) int {
 func configUsage() {
 	fmt.Print(`Usage:
   reasonix config auto-plan [off|on]
+  reasonix config memory-v5 [off|on|status]
   reasonix config reasoning-language [--local] [auto|zh|en]
 `)
 }
@@ -1783,6 +1906,12 @@ func configUsage() {
 func configAutoPlanUsage() {
 	fmt.Print(`Usage:
   reasonix config auto-plan [off|on]
+`)
+}
+
+func configMemoryV5Usage() {
+	fmt.Print(`Usage:
+  reasonix config memory-v5 [off|on|status]
 `)
 }
 

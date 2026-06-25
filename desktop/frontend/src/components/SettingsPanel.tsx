@@ -32,6 +32,7 @@ import {
 import { getAvailableFontFamilies, getAvailableMonoFontFamilies } from "../lib/fontAvailability";
 import { getDisplayMode, onDisplayModeChange, setDisplayMode as setLocalDisplayMode } from "../lib/displayMode";
 import { DEFAULT_STATUS_BAR_ITEMS, normalizeStatusBarItems, type StatusBarItemId } from "../lib/statusBarItems";
+import { normalizeToolApprovalMode } from "../lib/types";
 import {
   comboFromKeyboardEvent,
   detectShortcutPlatform,
@@ -602,6 +603,7 @@ const REASONING_PROTOCOLS: readonly string[] = ["", "deepseek", "openai", "none"
 const PROXY_TYPES = ["http", "https", "socks5", "socks5h"] as const;
 const LANGUAGE_PREFS: LangPref[] = ["", "zh", "en"];
 const AUTO_PLAN_MODES = ["off", "on"] as const;
+const TOOL_APPROVAL_MODES = ["ask", "auto", "yolo"] as const;
 const BOT_TOOL_APPROVAL_MODES = ["", "ask", "auto", "yolo"] as const;
 
 type ProxyMode = (typeof PROXY_MODES)[number];
@@ -812,6 +814,7 @@ function normalizeSettingsView(view: SettingsView | null | undefined): SettingsV
     agent,
     bot: normalizeBotSettings(view.bot),
     autoPlan: normalizeAutoPlan(view.autoPlan),
+    defaultToolApprovalMode: normalizeToolApprovalMode(view.defaultToolApprovalMode),
     autoApproveTools: Boolean(view.autoApproveTools ?? view.bypass),
     bypass: Boolean(view.autoApproveTools ?? view.bypass),
     desktopLanguage: normalizeLangPref(view.desktopLanguage),
@@ -823,6 +826,7 @@ function normalizeSettingsView(view: SettingsView | null | undefined): SettingsV
     statusBarStyle: normalizeStatusBarStyle(view.statusBarStyle),
     statusBarItems: normalizeStatusBarItems(view.statusBarItems),
     checkUpdates: view.checkUpdates !== false,
+    memoryCompilerEnabled: view.memoryCompilerEnabled !== false,
   };
 }
 
@@ -939,6 +943,8 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
   useEffect(() => onDisplayModeChange((mode) => setDisplayMode(mode)), []);
   useEffect(() => () => mouseDragCleanupRef.current?.(), []);
   const autoPlan = normalizeAutoPlan(s.autoPlan);
+  const defaultToolApprovalMode = normalizeToolApprovalMode(s.defaultToolApprovalMode);
+  const memoryCompilerEnabled = s.memoryCompilerEnabled !== false;
   const languagePref = normalizeLangPref(s.desktopLanguage);
   const desktopLayoutStyle = normalizeDesktopLayoutStyle(s.desktopLayoutStyle);
   const [genMusicPreset, setGenMusicPreset] = useState<GenerativePreset>(getGenerativePreset());
@@ -1156,6 +1162,20 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
           ))}
         </div>
       </SettingsField>
+      <SettingsField label={t("settings.defaultToolApprovalMode")} hint={t("settings.defaultToolApprovalModeHint")}>
+        <div className="set-seg">
+          {TOOL_APPROVAL_MODES.map((mode) => (
+            <button
+              key={mode}
+              className={`set-seg__btn${defaultToolApprovalMode === mode ? " set-seg__btn--on" : ""}`}
+              disabled={busy}
+              onClick={() => void apply(() => app.SetDefaultToolApprovalMode(mode))}
+            >
+              {t(`settings.defaultToolApprovalMode.${mode}`)}
+            </button>
+          ))}
+        </div>
+      </SettingsField>
       <SettingsField label={t("settings.autoPlan")}>
         <div className="set-seg">
           {AUTO_PLAN_MODES.map((mode) => (
@@ -1169,6 +1189,13 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
             </button>
           ))}
         </div>
+      </SettingsField>
+      <SettingsField label={t("settings.memoryCompiler")} hint={t("settings.memoryCompilerHint")}>
+        <ToggleSegment
+          value={memoryCompilerEnabled}
+          disabled={busy}
+          onChange={(enabled) => void apply(() => app.SetMemoryCompilerEnabled(enabled))}
+        />
       </SettingsField>
       <SettingsField label={t("settings.sound")} hint={t("settings.soundHint")} stacked>
         <div className={`settings-sound-editor${soundExpanded ? " settings-sound-editor--expanded" : ""}`}>
@@ -3043,7 +3070,7 @@ function ModelsSection({ s, busy, apply, backgroundApply }: ModelsSectionProps) 
       {subtab === "usage" ? (
         <>
           <SettingsSection title={t("settings.modelUsage")}>
-            <SettingsField label={t("settings.defaultModel")}>
+            <SettingsField label={t("settings.defaultModel")} hint={t("settings.defaultModelHint")}>
               <ModelPicker
                 s={s}
                 refs={refs}

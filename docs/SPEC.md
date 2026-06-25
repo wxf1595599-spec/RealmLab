@@ -284,8 +284,21 @@ func (p Policy) Decide(toolName string, readOnly bool, args json.RawMessage) Dec
   hard block in *every* mode: the tool never executes and the model receives a
   "blocked" result it can adapt to (the same shape as a plan-mode refusal).
 - **Relationship to plan mode.** Plan mode (§3.4) is an orthogonal, coarser gate
-  that refuses *all* writers regardless of policy; it is checked first. The
-  permission layer is the fine-grained, always-on gate underneath it.
+  checked before the permission layer. Its boundary is fail-closed for untrusted
+  tools: while planning, a tool runs only if it reports a *trustworthy*
+  `ReadOnly()==true` — a built-in or a first-party MCP `ReadOnlyToolNames`
+  override — or self-reports plan-safe via `tool.PlanModeClassifier`. An MCP
+  tool's `ReadOnly()` may instead come from the server's self-reported
+  `readOnlyHint`, which plan mode does not trust (`tool.PlanModeUntrustedReadOnly`):
+  such a tool is gated like a writer. Writers, installers, memory mutation, process
+  control, and `complete_step` (read-only yet post-approval only, so it
+  self-reports plan-unsafe) are refused; the enforced invariant is
+  PlanSafe ⇒ ReadOnly. An untrusted read-only MCP/plugin tool is therefore blocked
+  until declared in `[agent].plan_mode_allowed_tools`, and is likewise excluded
+  from read-only research sub-agents. Plan mode still allows `read_only_task` and
+  `read_only_skill`, whose sub-agents receive only read-only research tools and
+  safe foreground bash; writer-capable `task` delegation and full skill execution
+  remain blocked.
 - **User decisions are separate from tool approvals.** Runtime tool approval has
   three user-facing postures: `ask` ("需要批准"), `auto` ("自动批准"), and
   `yolo` ("Yolo批准"). `auto` lets the permission policy auto-approve the writer
@@ -458,7 +471,8 @@ feeds workspace-scoped, non-provider `${VAR}` expansion for MCP/plugin settings
 without importing provider keys or Reasonix control variables. Step-limit
 preferences belong in the user config.
 Project `reasonix.toml` does not override `agent.max_steps` or
-`agent.planner_max_steps`.
+`agent.planner_max_steps`, and it does not override the user-level Memory v5
+compiler switch.
 
 ```toml
 default_model = "deepseek"   # provider name (→ its default model) or "provider/model"
@@ -469,7 +483,10 @@ system_prompt = "You are Reasonix, a coding agent..."  # or system_prompt_file =
 max_steps         = 0    # user/global only; executor tool-call rounds; 0 = no limit
 planner_max_steps = 0    # user/global only; planner read-only tool-call rounds; 0 = no limit
 temperature       = 0.0
+memory_compiler = { enabled = true }   # user/global only; Memory v5 execution compiler; CLI: reasonix config memory-v5 off|on|status
 reasoning_language = "auto"       # visible reasoning text: auto|zh|en
+# plan_mode_allowed_tools = ["custom_reader"]   # extra read-only declarations for custom tools;
+#                                                # cannot unlock known blocked tools or unsafe bash
 # planner_model = "deepseek-pro"   # optional: two-model collaboration (low-frequency planner)
 # subagent_model = "deepseek-pro"   # optional default for runAs=subagent skills
 # subagent_models = { review = "deepseek-pro", security_review = "deepseek-pro" }
@@ -509,6 +526,12 @@ ask   = []                                 # force a prompt even if otherwise al
 # workspace_root = ""          # file-writers confined here; empty = cwd
 # allow_write    = ["/tmp"]    # extra dirs write_file/edit_file/multi_edit/move_file may modify
 
+[serve]
+auth_mode = "none"             # none|token|password; use auth before binding beyond localhost
+# token = ""                   # optional fixed token; empty token mode generates one at startup
+# password_hash = ""           # bcrypt hash generated with reasonix serve --hash-password --password '...'
+# behind_proxy = false         # trust X-Forwarded-* only behind a trusted reverse proxy
+
 [[plugins]]
 name    = "example"            # type defaults to "stdio"
 command = "reasonix-plugin-example"
@@ -523,6 +546,13 @@ args    = []
 ```
 
 `reasonix setup` writes this default config so the CLI is usable out of the box.
+`[serve]` controls the HTTP browser frontend used by `reasonix serve`. The
+default `auth_mode = "none"` is intended for the loopback default
+`127.0.0.1:8787`; deployments reachable from another machine must use `token` or
+`password`. Password mode requires either a startup `--password` or a stored
+bcrypt `password_hash`. `behind_proxy` must stay false unless the server is
+behind a trusted proxy that owns the `X-Forwarded-For` and `X-Forwarded-Proto`
+headers.
 
 MCP servers may also be declared in a project-root `.mcp.json` using Claude
 Code's exact `mcpServers` schema (`command`/`args`/`env`, `type`/`url`/`headers`,
