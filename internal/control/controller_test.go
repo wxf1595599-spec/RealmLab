@@ -563,6 +563,24 @@ func TestResumeResetsTwoModelPlannerContext(t *testing.T) {
 	}
 }
 
+func TestResumeRefreshesSavedSystemPrompt(t *testing.T) {
+	dir := t.TempDir()
+	exec := agent.New(nil, nil, agent.NewSession("old sys"), agent.Options{}, event.Discard)
+	c := New(Options{Executor: exec, SystemPrompt: "new sys", SessionDir: dir, SessionPath: filepath.Join(dir, "old.jsonl"), Label: "test"})
+	resumed := agent.NewSession("old sys")
+	resumed.Add(provider.Message{Role: provider.RoleUser, Content: "saved task"})
+
+	c.Resume(resumed, filepath.Join(dir, "resumed.jsonl"))
+
+	history := c.History()
+	if len(history) == 0 || history[0].Role != provider.RoleSystem || history[0].Content != "new sys" {
+		t.Fatalf("resumed system prompt = %+v, want refreshed current prompt", history)
+	}
+	if len(history) < 2 || history[1].Content != "saved task" {
+		t.Fatalf("resumed user history was not preserved: %+v", history)
+	}
+}
+
 func TestResetPlannerSessionClearsPlannerHistory(t *testing.T) {
 	dir := t.TempDir()
 	planner := &recordingProvider{name: "planner", streams: [][]provider.Chunk{

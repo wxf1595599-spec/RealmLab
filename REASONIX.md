@@ -1,8 +1,18 @@
-# Reasonix project memory
+# RealmLab project memory
 
-This file is loaded into every session's system prompt (the cache-stable prefix),
-so keep it concise and durable — it is the project's standing instructions to the
-agent. It is the Reasonix analog of Claude Code's CLAUDE.md.
+This legacy-named file is loaded into every session's system prompt (the
+cache-stable prefix), so keep it concise and durable. It is the project's
+standing instructions to the agent.
+
+## Branding
+
+- User-facing product and assistant name: MicroRealm Lab.
+- Desktop app/product name: RealmLab IDE.
+- Do not call the product or assistant Reasonix in titles, summaries, UI copy,
+  or explanatory prose.
+- Use `reasonix` only for literal legacy/internal identifiers such as the Go
+  module path, imports, `cmd/reasonix`, `reasonix.toml`, `.reasonix/`, or the
+  upstream repository URL.
 
 ## Conventions
 
@@ -17,9 +27,9 @@ agent. It is the Reasonix analog of Claude Code's CLAUDE.md.
 
 ## Memory
 
-- Hierarchical docs: `REASONIX.md` (this file, committed/shared), `REASONIX.local.md`
-  (personal, git-ignored), user-global `~/.config/reasonix/REASONIX.md`, and any
-  `REASONIX.md` in an ancestor dir. `AGENTS.md` is accepted as a fallback name.
+- Hierarchical docs: this project memory file, `REASONIX.local.md` (personal,
+  git-ignored), user-global `~/.config/reasonix/REASONIX.md`, and any ancestor
+  memory file. `AGENTS.md` is accepted as a fallback name.
 - `@path` on its own line imports another file's contents.
 - `#<note>` in chat quick-adds a line here. The `remember` tool saves durable
   facts to the per-project auto-memory store (frontmatter files + `MEMORY.md`

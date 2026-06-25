@@ -15,6 +15,11 @@ The upstream module path is intentionally still `reasonix` for now. It is used
 throughout Go `internal` imports and should only be renamed as a dedicated
 migration after the first RealmLab product requirements are clear.
 
+For user-facing product copy, assistant replies, titles, and summaries, use
+`MicroRealm Lab` or `RealmLab IDE`, not the upstream project name. The word
+`reasonix` should appear only when exact technical identifiers require it, such
+as module paths, commands, config filenames, storage paths, or upstream URLs.
+
 ## Current Project Identity
 
 - CLI build output: `bin/realmlab`
@@ -64,7 +69,8 @@ cd ../.. && cd desktop && wails build
 
 Keep early RealmLab changes small and reversible:
 
-- Preserve the Reasonix kernel until RealmLab-specific behavior is defined.
+- Preserve the upstream-derived kernel until RealmLab-specific behavior is
+  defined.
 - Avoid broad package-path renames before tests and release packaging are green.
 - Treat macOS and Windows packaging as release targets, not cross-compiled Wails
   artifacts.

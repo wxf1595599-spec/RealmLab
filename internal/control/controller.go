@@ -1898,6 +1898,18 @@ func (c *Controller) summarizeAt(ctx context.Context, turn int, from bool) error
 // Resume seeds the session from a loaded transcript and pins the active file to
 // its path so auto-save keeps appending there.
 func (c *Controller) Resume(s *agent.Session, path string) {
+	if s != nil && strings.TrimSpace(c.systemPrompt) != "" {
+		msgs := s.Snapshot()
+		switch {
+		case len(msgs) == 0:
+			msgs = []provider.Message{{Role: provider.RoleSystem, Content: c.systemPrompt}}
+		case msgs[0].Role == provider.RoleSystem:
+			msgs[0].Content = c.systemPrompt
+		default:
+			msgs = append([]provider.Message{{Role: provider.RoleSystem, Content: c.systemPrompt}}, msgs...)
+		}
+		s.Replace(msgs)
+	}
 	if c.executor != nil {
 		c.executor.SetSession(s)
 	}

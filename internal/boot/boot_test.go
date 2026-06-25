@@ -1875,6 +1875,15 @@ api_key_env = "REASONIX_TEST_KEY_UNSET"
 	if !strings.HasPrefix(sys, config.RealmLabIdentityPolicy+"\n\n") {
 		t.Fatalf("RealmLab identity policy should be first in system prompt:\n%s", sys)
 	}
+	for _, want := range []string{
+		"Never use Reasonix",
+		"user-facing product name",
+		"legacy/internal implementation identifier",
+	} {
+		if !strings.Contains(sys, want) {
+			t.Fatalf("RealmLab identity policy missing %q:\n%s", want, sys)
+		}
+	}
 }
 
 func TestBuildLanguagePolicyIsAppended(t *testing.T) {
