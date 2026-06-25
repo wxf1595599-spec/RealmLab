@@ -3030,8 +3030,8 @@ a[href] {
   animation: startup-splash-in 0.55s cubic-bezier(0.2, 0.7, 0.1, 1) both;
 }
 .startup-splash__mark {
-  width: 64px;
-  height: 64px;
+  width: 76px;
+  height: 76px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3039,8 +3039,8 @@ a[href] {
   margin-bottom: 22px;
 }
 .startup-splash__mark img {
-  width: 64px;
-  height: 64px;
+  width: 76px;
+  height: 76px;
   display: block;
 }
 .startup-splash__name {
@@ -3445,9 +3445,9 @@ a[href] {
 }
 
 .welcome {
-  --welcome-brand-width: 312px;
-  --welcome-brand-height: 62px;
-  --welcome-brand-gap: 26px;
+  --welcome-brand-width: 366px;
+  --welcome-brand-height: 86px;
+  --welcome-brand-gap: 28px;
   width: min(100%, 600px);
   max-height: none;
   min-height: 0;
@@ -3550,8 +3550,8 @@ a[href] {
 
 @container (max-height: 560px) {
   .welcome--brand {
-    --welcome-brand-width: 286px;
-    --welcome-brand-height: 58px;
+    --welcome-brand-width: 318px;
+    --welcome-brand-height: 74px;
     --welcome-brand-gap: 22px;
     transform: translateY(-16px);
   }
@@ -15656,8 +15656,8 @@ a[href] {
   gap: 14px;
 }
 .onboarding__logo {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   align-self: flex-start;
   margin-bottom: 4px;
 }
@@ -19253,9 +19253,9 @@ a[href] {
 
 .sidebar__brand {
   display: flex;
-  flex: 0 0 36px;
+  flex: 0 0 48px;
   align-items: center;
-  min-height: 36px;
+  min-height: 48px;
   padding: 2px var(--sidebar-entry-content-inset);
   margin-bottom: 10px;
   color: var(--fg);
@@ -19264,9 +19264,9 @@ a[href] {
 .sidebar__brand-logo {
   flex: 0 0 auto;
   display: block;
-  width: 168px;
-  height: 34px;
-  margin-left: -10px;
+  width: 192px;
+  height: 45px;
+  margin-left: -8px;
   object-fit: contain;
   object-position: left center;
 }
@@ -22219,13 +22219,13 @@ a[href] {
 
 .sidebar--workbench .sidebar__head {
   flex: 0 0 auto;
-  min-height: 30px;
+  min-height: 38px;
   margin: 0 0 6px;
 }
 
 .sidebar--workbench .sidebar__brand {
-  flex: 0 0 30px;
-  min-height: 30px;
+  flex: 0 0 38px;
+  min-height: 38px;
   gap: 10px;
   padding: 0 12px;
   margin-bottom: 0;
@@ -22236,8 +22236,8 @@ a[href] {
 }
 
 :root[data-theme-style] .sidebar--workbench .sidebar__brand {
-  flex: 0 0 30px;
-  min-height: 30px;
+  flex: 0 0 38px;
+  min-height: 38px;
   padding: 0 12px;
   margin-bottom: 0;
 }
@@ -22247,9 +22247,9 @@ a[href] {
 }
 
 .sidebar--workbench .sidebar__brand-logo--workbench {
-  width: 150px;
-  height: 28px;
-  margin-left: -8px;
+  width: 172px;
+  height: 40px;
+  margin-left: -6px;
 }
 
 .sidebar--workbench .sidebar__brand svg {
@@ -24203,16 +24203,16 @@ a[href] {
 
 .app--creation .sidebar__brand,
 :root[data-theme-style] .app--creation .sidebar__brand {
-  min-height: 30px;
+  min-height: 40px;
   margin-bottom: 18px;
   padding-inline: 8px;
 }
 
 .app--creation .sidebar__brand-logo,
 :root[data-theme-style] .app--creation .sidebar__brand-logo {
-  width: 150px;
-  height: 30px;
-  margin-left: -8px;
+  width: 172px;
+  height: 40px;
+  margin-left: -6px;
 }
 
 .app--creation .sidebar__new,

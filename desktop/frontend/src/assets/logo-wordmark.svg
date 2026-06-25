@@ -1,34 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 120" role="img" aria-label="MicroRealm Lab">
-  <defs>
-    <linearGradient id="realm-star" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4d8df6"/>
-      <stop offset="1" stop-color="#1f5fe8"/>
-    </linearGradient>
-    <style>
-      .word {
-        font-family: "Avenir Next Rounded", "Avenir Next", "Nunito Sans", "Arial Rounded MT Bold", system-ui, sans-serif;
-        font-weight: 900;
-        letter-spacing: -3px;
-      }
-      .main {
-        fill: #111827;
-      }
-      .accent {
-        fill: url(#realm-star);
-      }
-      .warm {
-        fill: #ff9a2f;
-      }
-    </style>
-  </defs>
-  <g transform="translate(16 14)">
-    <text class="word main" x="0" y="82" font-size="74" textLength="438" lengthAdjust="spacingAndGlyphs">MicroRealm</text>
-    <g transform="translate(468 44)">
-      <path class="accent" d="M38 0c4.3 18.1 8.1 21.9 26.2 26.2C46.1 30.5 42.3 34.3 38 52.4 33.7 34.3 29.9 30.5 11.8 26.2 29.9 21.9 33.7 18.1 38 0Z"/>
-      <circle class="warm" cx="38" cy="26.2" r="5.8"/>
-      <path fill="#ffffff" opacity="0.82" d="M37.8 10.4c2.3 8.2 4.5 10.3 12.7 12.7-8.2 2.3-10.4 4.5-12.7 12.7-2.4-8.2-4.5-10.4-12.7-12.7 8.2-2.4 10.3-4.5 12.7-12.7Z"/>
-    </g>
-    <text class="word main" x="552" y="82" font-size="74" textLength="164" lengthAdjust="spacingAndGlyphs">Lab</text>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 140" width="600" height="140" role="img" aria-label="MicroRealm">
+  <text x="20" y="105" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="100" letter-spacing="-5">
+    <tspan font-weight="600" fill="#0A0A0A">Micro</tspan><tspan font-weight="200" fill="#3F3F46">Realm</tspan>
+  </text>
 </svg>
