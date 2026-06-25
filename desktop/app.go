@@ -1000,18 +1000,16 @@ func (a *App) NewSession() error {
 	if err := ctrl.NewSession(); err != nil {
 		return err
 	}
-	if err := a.assignFreshSessionTopic(tab); err != nil {
-		return err
-	}
+	a.assignFreshSessionTopic(tab)
 	a.persistTabSessionPath(tab, ctrl.SessionPath())
 	a.invalidatePromptHistoryCache()
 	a.emitProjectTreeChanged()
 	return nil
 }
 
-func (a *App) assignFreshSessionTopic(tab *WorkspaceTab) error {
+func (a *App) assignFreshSessionTopic(tab *WorkspaceTab) {
 	if tab == nil {
-		return workspaceNotReadyErr(tab)
+		return
 	}
 	scope := tab.Scope
 	workspaceRoot := tab.WorkspaceRoot
@@ -1021,12 +1019,6 @@ func (a *App) assignFreshSessionTopic(tab *WorkspaceTab) error {
 		workspaceRoot = normalizeProjectRoot(workspaceRoot)
 	}
 	topicID := newTopicID()
-	if err := ensureTopicIndexed(scope, workspaceRoot, topicID, defaultTopicTitle, topicTitleSourceAuto); err != nil {
-		return err
-	}
-	if err := setTopicCreatedAt(topicTitleRoot(scope, workspaceRoot), topicID, time.Now().UnixMilli()); err != nil {
-		return err
-	}
 	a.mu.Lock()
 	if current := a.tabs[tab.ID]; current == tab {
 		tab.TopicID = topicID
@@ -1037,7 +1029,12 @@ func (a *App) assignFreshSessionTopic(tab *WorkspaceTab) error {
 		tab.TopicTitle = defaultTopicTitle
 	}
 	a.mu.Unlock()
-	return nil
+	// NewSession already rotated the runtime to a fresh session. If the sidebar
+	// topic index repair fails here, keep the session usable and let persisted
+	// session metadata repair the topic index later instead of surfacing a false
+	// "new session failed" error to the frontend.
+	_ = ensureTopicIndexed(scope, workspaceRoot, topicID, defaultTopicTitle, topicTitleSourceAuto)
+	_ = setTopicCreatedAt(topicTitleRoot(scope, workspaceRoot), topicID, time.Now().UnixMilli())
 }
 
 func messagesHaveConversationContent(messages []provider.Message) bool {

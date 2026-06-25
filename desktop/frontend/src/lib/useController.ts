@@ -215,6 +215,7 @@ export function sameMeta(a?: Meta, b?: Meta): boolean {
 }
 
 const STALE_TURN_RECONCILE_MS = 30_000;
+const CANCEL_RECONCILE_DELAYS_MS = [0, 100, 300, 1_000] as const;
 
 export function shouldReconcileStaleTurn(
   state: Pick<State, "running" | "turnActive"> | undefined,
@@ -825,6 +826,7 @@ export function replayPendingPromptsForActiveTab(activeTabId: string | undefined
 export function useController() {
   const statesRef = useRef<TabStates>(new Map());
   const lastTurnActivityAtByTab = useRef(new Map<string, number>());
+  const cancelReconcileTimers = useRef(new Map<string, number>());
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
   const activeTabIdRef = useRef<string | undefined>(undefined);
   // A render-triggering counter so that mutations to a non-active tab's state still
@@ -1041,6 +1043,30 @@ export function useController() {
     return tabs;
   }, [dispatchTo, loadSessionDataForTab]);
 
+  const clearCancelReconcileTimer = useCallback((tabId: string) => {
+    const timer = cancelReconcileTimers.current.get(tabId);
+    if (timer === undefined) return;
+    window.clearTimeout(timer);
+    cancelReconcileTimers.current.delete(tabId);
+  }, []);
+
+  const scheduleCancelReconcile = useCallback((tabId: string, attempt = 0) => {
+    clearCancelReconcileTimer(tabId);
+    const delay = CANCEL_RECONCILE_DELAYS_MS[Math.min(attempt, CANCEL_RECONCILE_DELAYS_MS.length - 1)];
+    const timer = window.setTimeout(() => {
+      cancelReconcileTimers.current.delete(tabId);
+      void reconcileTabRuntime(tabId, { hydrateSessionData: false }).then((tabs) => {
+        const tab = tabs?.find((candidate) => candidate.id === tabId);
+        if (!tab) return;
+        const stillReconciling = foregroundRunningFromRuntimeMeta(tab) || Boolean(tab.cancelRequested);
+        if (stillReconciling && attempt + 1 < CANCEL_RECONCILE_DELAYS_MS.length) {
+          scheduleCancelReconcile(tabId, attempt + 1);
+        }
+      }).catch(() => {});
+    }, delay);
+    cancelReconcileTimers.current.set(tabId, timer);
+  }, [clearCancelReconcileTimer, reconcileTabRuntime]);
+
   useEffect(() => {
     const textBatch = createRafBatch<{ tabId: string; e: WireEvent }>((batch) => {
       for (const { tabId, e } of batch) dispatchTo(tabId, { type: "event", e });
@@ -1096,7 +1122,15 @@ export function useController() {
     // and no way to stop (#3844).
     void app.ReplayPendingPrompts().catch(() => {});
 
-    return () => { textBatch.drain(); off(); offReady(); };
+    return () => {
+      textBatch.drain();
+      for (const timer of cancelReconcileTimers.current.values()) {
+        window.clearTimeout(timer);
+      }
+      cancelReconcileTimers.current.clear();
+      off();
+      offReady();
+    };
   }, [dispatchTo, loadSessionDataForTab, refreshCheckpoints, syncActiveTabFromBackend]);
 
   // Stale-turn watchdog: if the frontend thinks the agent is running but the
@@ -1178,11 +1212,11 @@ export function useController() {
 
   const cancelTab = useCallback((tabId: string) => {
     app.CancelTab(tabId)
-      .then(() => reconcileTabRuntime(tabId))
+      .then(() => scheduleCancelReconcile(tabId))
       .catch((error) => {
         dispatchTo(tabId, { type: "local_notice", level: "warn", text: `Cancel failed: ${errorMessage(error)}` });
       });
-  }, [dispatchTo, reconcileTabRuntime]);
+  }, [dispatchTo, scheduleCancelReconcile]);
 
   const cancel = useCallback((): string | undefined => {
     const cur = stateRef.current;

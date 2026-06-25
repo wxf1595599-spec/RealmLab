@@ -29,13 +29,13 @@ function flushPromises(): Promise<void> {
 }
 
 async function waitFor(label: string, predicate: () => boolean) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await act(async () => {
-      await flushPromises();
-    });
-    if (predicate()) return;
-  }
-  throw new Error(`timed out waiting for ${label}`);
+	for (let attempt = 0; attempt < 50; attempt += 1) {
+		await act(async () => {
+			await flushPromises(20);
+		});
+		if (predicate()) return;
+	}
+	throw new Error(`timed out waiting for ${label}`);
 }
 
 function tabMeta(overrides: Partial<TabMeta> = {}): TabMeta {
@@ -149,6 +149,9 @@ await act(async () => {
   await flushPromises();
 });
 await waitFor("active tab", () => controller?.activeTabId === "tab-a");
+await act(async () => {
+  await flushPromises(50);
+});
 
 backendRunning = true;
 await act(async () => {
@@ -162,7 +165,14 @@ await act(async () => {
   await flushPromises();
   await flushPromises();
 });
-await waitFor("cancel reconciliation", () => controller?.state.running === false);
+
+for (let attempt = 0; attempt < 20 && controller?.state.running; attempt += 1) {
+  await act(async () => {
+    await flushPromises(50);
+  });
+}
+
+eq(controller?.state.running, false, "cancel reconciliation clears the running state");
 eq(cancelCalls, 1, "CancelTab is called once");
 eq(controller?.state.cancelRequested, false, "cancel reconciliation clears cancelRequested");
 
