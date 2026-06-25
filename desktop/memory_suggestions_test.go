@@ -172,19 +172,19 @@ func TestMemorySuggestionsAcceptSkillCandidate(t *testing.T) {
 	view := app.MemorySuggestions()
 	var candidate SkillSuggestion
 	for _, item := range view.Skills {
-		if item.Name == "reasonix-pr-followup" {
+		if item.Name == "microrealm-pr-followup" {
 			candidate = item
 			break
 		}
 	}
 	if candidate.Name == "" {
-		t.Fatalf("MemorySuggestions() skills = %+v, want reasonix-pr-followup", view.Skills)
+		t.Fatalf("MemorySuggestions() skills = %+v, want microrealm-pr-followup", view.Skills)
 	}
 	path, err := app.AcceptSkillSuggestion(candidate)
 	if err != nil {
 		t.Fatalf("AcceptSkillSuggestion: %v", err)
 	}
-	wantSuffix := filepath.Join(".reasonix", "skills", "reasonix-pr-followup", "SKILL.md")
+	wantSuffix := filepath.Join(".reasonix", "skills", "microrealm-pr-followup", "SKILL.md")
 	if !strings.HasSuffix(path, wantSuffix) {
 		t.Fatalf("skill path = %q, want suffix %q", path, wantSuffix)
 	}
@@ -192,7 +192,7 @@ func TestMemorySuggestionsAcceptSkillCandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read skill: %v", err)
 	}
-	if !strings.Contains(string(body), "Review or update a Reasonix GitHub PR") {
+	if !strings.Contains(string(body), "Review or update a MicroRealm Lab GitHub PR") {
 		t.Fatalf("skill body missing description: %s", body)
 	}
 }

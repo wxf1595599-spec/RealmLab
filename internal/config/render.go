@@ -44,10 +44,10 @@ func RenderTOMLForScope(c *Config, scope RenderScope) string {
 	defaults := Default()
 	var b strings.Builder
 
-	b.WriteString("# Reasonix configuration.\n")
+	b.WriteString("# MicroRealm Lab configuration.\n")
 	fmt.Fprintf(&b, "# Resolution order: flag > ./reasonix.toml > %s > built-in defaults.\n", userConfigDisplayPath())
 	b.WriteString("# Fields marked user/global only are not overridden by ./reasonix.toml.\n")
-	b.WriteString("# Secrets are named via api_key_env and stored in Reasonix's global .env; never put keys here.\n\n")
+	b.WriteString("# Secrets are named via api_key_env and stored in MicroRealm Lab's global .env; never put keys here.\n\n")
 
 	fmt.Fprintf(&b, "config_version = %d   # schema marker for diagnostics; old versions may ignore it\n", configVersion(c))
 	fmt.Fprintf(&b, "default_model = %q\n", c.DefaultModel)
@@ -57,7 +57,7 @@ func RenderTOMLForScope(c *Config, scope RenderScope) string {
 		b.WriteString("# language      = \"zh\"   # ui/model language; empty = auto-detect from $LANG / $REASONIX_LANG\n")
 	}
 	if scope != RenderScopeProject {
-		fmt.Fprintf(&b, "credentials_store = %q   # legacy compatibility; provider keys are saved in Reasonix's global .env\n", normalizeCredentialsStore(c.CredentialsStore))
+		fmt.Fprintf(&b, "credentials_store = %q   # legacy compatibility; provider keys are saved in MicroRealm Lab's global .env\n", normalizeCredentialsStore(c.CredentialsStore))
 	}
 	b.WriteString("\n")
 

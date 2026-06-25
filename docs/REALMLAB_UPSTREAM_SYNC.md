@@ -23,6 +23,9 @@ These changes are product decisions and must survive every upstream merge:
 
 - Desktop product name and bundle identity stay `RealmLab`.
 - Desktop output bundle stays `RealmLab.app` for local/user-facing builds.
+- User-facing desktop brand copy stays `MicroRealm Lab`; upstream `Reasonix`
+  wording may remain only in internal compatibility paths, module names, or
+  source comments where renaming would create unnecessary merge risk.
 - Default desktop appearance stays `light` theme + `slate` visual style. This
   is RealmLab's current palette and must remain the first-run/package default.
 - CLI build output stays `bin/realmlab` unless a dedicated rename plan changes

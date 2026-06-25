@@ -795,8 +795,8 @@ func TestSettingsShowsGlobalCredentialWithoutMutatingWorkspaceEnv(t *testing.T) 
 		if p.Name != "settings-provider" {
 			continue
 		}
-		if !p.KeySet || !strings.Contains(p.KeySource, "Reasonix credentials") {
-			t.Fatalf("settings-provider key = set:%v source:%q, want Reasonix credentials: %+v", p.KeySet, p.KeySource, p)
+		if !p.KeySet || !strings.Contains(p.KeySource, "MicroRealm Lab credentials") {
+			t.Fatalf("settings-provider key = set:%v source:%q, want MicroRealm Lab credentials: %+v", p.KeySet, p.KeySource, p)
 		}
 		if env := os.Getenv("SHARED_SETTINGS_KEY"); env != "from-project" {
 			t.Fatalf("Settings mutated SHARED_SETTINGS_KEY = %q, want existing project env", env)

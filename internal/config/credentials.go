@@ -220,11 +220,11 @@ func loadCredentialStoreForRoot(root string) {
 		return
 	}
 	if p := UserCredentialsPath(); p != "" {
-		loadDotEnvFileAs(p, CredentialSource{Kind: CredentialSourceCredentials, Path: p, Label: "Reasonix credentials (.env)"})
+		loadDotEnvFileAs(p, CredentialSource{Kind: CredentialSourceCredentials, Path: p, Label: "MicroRealm Lab credentials (.env)"})
 	}
 }
 
-// StoreCredentialLines stores KEY=value assignments in Reasonix's global .env
+// StoreCredentialLines stores KEY=value assignments in MicroRealm Lab's global .env
 // and pins them into the current process environment.
 func StoreCredentialLines(lines []string) (string, error) {
 	assignments := parseCredentialLines(lines)
@@ -319,7 +319,7 @@ func parseCredentialLines(lines []string) map[string]string {
 func pinCredentialAssignments(assignments map[string]string) {
 	for key, value := range assignments {
 		_ = os.Setenv(key, value)
-		recordCredentialSource(key, value, CredentialSource{Kind: CredentialSourceCredentials, Path: UserCredentialsPath(), Label: "Reasonix credentials (.env)"})
+		recordCredentialSource(key, value, CredentialSource{Kind: CredentialSourceCredentials, Path: UserCredentialsPath(), Label: "MicroRealm Lab credentials (.env)"})
 	}
 }
 
@@ -372,11 +372,11 @@ func credentialSourceLabel(source CredentialSource) string {
 	case CredentialSourceProjectEnv:
 		return "project .env"
 	case CredentialSourceCredentials:
-		return "Reasonix credentials"
+		return "MicroRealm Lab credentials"
 	case CredentialSourceHomeEnv:
 		return "home .env"
 	case CredentialSourceLegacy:
-		return "legacy Reasonix credentials"
+		return "legacy MicroRealm Lab credentials"
 	case CredentialSourceEnvironment:
 		return "environment variable"
 	default:
@@ -437,7 +437,7 @@ func resolveCredentialForRootGlobalFirst(root, key string) CredentialResolution 
 func storedCredentialValue(key string) (string, CredentialSource, bool) {
 	if p := UserCredentialsPath(); p != "" {
 		if value, ok := envFileValue(p, key); ok && value != "" {
-			return value, CredentialSource{Kind: CredentialSourceCredentials, Path: p, Label: "Reasonix credentials (.env)"}, true
+			return value, CredentialSource{Kind: CredentialSourceCredentials, Path: p, Label: "MicroRealm Lab credentials (.env)"}, true
 		}
 	}
 	return "", CredentialSource{}, false

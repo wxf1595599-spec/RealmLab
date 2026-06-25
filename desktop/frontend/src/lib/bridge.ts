@@ -2156,7 +2156,7 @@ function makeMockApp(): AppBindings {
     },
     async ReadFile(rel: string) {
       const samples: Record<string, string> = {
-        "README.md": "# Reasonix\n\nBrowser-dev workspace preview.\n\n- Chat in the center\n- Browse files on the right\n- Keep sessions on the left\n",
+        "README.md": "# MicroRealm Lab\n\nBrowser-dev workspace preview.\n\n- Chat in the center\n- Browse files on the right\n- Keep sessions on the left\n",
         "go.mod": "module reasonix\n\ngo 1.23\n",
         "desktop/file.go": "package desktop\n\nfunc main() {\n\tprintln(\"workspace preview\")\n}\n",
         "internal/event.go": "package internal\n\n// mock file used by the browser dev seam\n",
@@ -2292,7 +2292,7 @@ function makeMockApp(): AppBindings {
           {
             path: "REASONIX.md",
             scope: "project",
-            body: "# Reasonix project memory\n\nMock doc shown in the browser dev seam.\n\n## Notes\n\n- prefers concise replies",
+            body: "# MicroRealm Lab project memory\n\nMock doc shown in the browser dev seam.\n\n## Notes\n\n- prefers concise replies",
           },
           {
             path: "~/.config/reasonix/REASONIX.md",
@@ -2343,9 +2343,9 @@ function makeMockApp(): AppBindings {
           {
             id: "skill-reasonix-pr-followup",
             name: "reasonix-pr-followup",
-            description: "Review or update a Reasonix GitHub PR, address feedback, verify, and publish safely.",
+            description: "Review or update a MicroRealm Lab GitHub PR, address feedback, verify, and publish safely.",
             scope: "project",
-            body: "# Reasonix PR Followup\n\nUse this skill for repeated Reasonix PR work.\n\n## Workflow\n\n1. Confirm branch and PR state.\n2. Inspect the diff.\n3. Fix actionable feedback.\n4. Verify and update the PR.\n",
+            body: "# MicroRealm Lab PR Followup\n\nUse this skill for repeated MicroRealm Lab PR work.\n\n## Workflow\n\n1. Confirm branch and PR state.\n2. Inspect the diff.\n3. Fix actionable feedback.\n4. Verify and update the PR.\n",
             reason: "recent history repeatedly touched PR workflows",
             evidence: ["mock-pr-session: 提交到pr，并更新内容", "mock-review-session: 解决该pr下机器人提出来的问题"],
           },
