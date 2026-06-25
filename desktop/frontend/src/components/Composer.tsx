@@ -1393,6 +1393,11 @@ export function Composer({
     voiceRecognitionRef.current?.stop();
   }, []);
 
+  const resetVoiceInputState = useCallback(() => {
+    voiceRecognitionRef.current = null;
+    setVoiceListening(false);
+  }, []);
+
   const toggleVoiceInput = useCallback(() => {
     if (voiceListening) {
       stopVoiceInput();
@@ -1448,15 +1453,16 @@ export function Composer({
       if (code === "aborted") return;
       if (code === "not-allowed" || code === "service-not-allowed") {
         showToast(t("composer.voicePermissionDenied"), "warn");
+        resetVoiceInputState();
         return;
       }
       if (code !== "no-speech") {
         showToast(t("composer.voiceStartFailed"), "warn");
       }
+      resetVoiceInputState();
     };
     recognition.onend = () => {
-      voiceRecognitionRef.current = null;
-      setVoiceListening(false);
+      resetVoiceInputState();
     };
 
     try {
@@ -1469,7 +1475,7 @@ export function Composer({
       setVoiceListening(false);
       showToast(t("composer.voiceStartFailed"), "warn");
     }
-  }, [locale, showToast, stopVoiceInput, t, voiceListening]);
+  }, [locale, resetVoiceInputState, showToast, stopVoiceInput, t, voiceListening]);
 
   useEffect(() => {
     if (!running) return;

@@ -81,6 +81,13 @@ class FakeSpeechRecognition extends EventTarget {
       results: [{ isFinal: true, 0: { transcript: text } }],
     } as FakeSpeechResultEvent);
   }
+
+  emitError(error: string) {
+    this.onerror?.({
+      ...new Event("error"),
+      error,
+    } as Event & { error?: string });
+  }
 }
 
 function installDom(options: { speechRecognition?: boolean } = {}) {
@@ -243,6 +250,33 @@ console.log("\ncomposer voice input");
   });
 
   ok(document.body.textContent?.includes("Voice input is not available here") ?? false, "unsupported desktop voice input explains the limitation");
+
+  await act(async () => {
+    root.unmount();
+  });
+  dom.window.close();
+}
+
+{
+  const dom = installDom();
+  const { root } = await renderComposer();
+
+  const voiceButton = document.querySelector(".composer__actions .composer__btn--voice") as HTMLButtonElement | null;
+  await act(async () => {
+    voiceButton?.click();
+    await flushTimers();
+  });
+
+  const recognition = FakeSpeechRecognition.instances[0];
+  await act(async () => {
+    recognition.emitError("not-allowed");
+    await flushTimers();
+  });
+
+  const textarea = document.querySelector("textarea") as HTMLTextAreaElement | null;
+  eq(voiceButton?.getAttribute("aria-pressed"), "false", "permission denial exits voice listening mode");
+  ok(Boolean(textarea && !textarea.disabled), "permission denial keeps the composer editable");
+  ok(document.body.textContent?.includes("Microphone permission was denied") ?? false, "permission denial is explained");
 
   await act(async () => {
     root.unmount();
