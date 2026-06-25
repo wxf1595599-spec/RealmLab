@@ -1382,10 +1382,12 @@ export function Composer({
   };
 
   const voiceSupported = useMemo(() => {
-    // Web Speech is unreliable inside the desktop WebView. Keep the experimental
-    // path available for browser previews, but do not surface it in RealmLab.app.
-    return !desktopRuntimeAvailable() && Boolean(speechRecognitionCtor());
+    // Web Speech is the current live transcription path. Desktop builds still
+    // render the entry point below so unsupported WebViews can explain what is
+    // missing instead of making voice input disappear.
+    return Boolean(speechRecognitionCtor());
   }, []);
+  const voiceVisible = voiceSupported || desktopRuntimeAvailable();
 
   const stopVoiceInput = useCallback(() => {
     voiceRecognitionRef.current?.stop();
@@ -2403,13 +2405,13 @@ export function Composer({
             </span>
           )}
           <div className="composer__actions">
-            {(voiceSupported || voiceListening) && (
-              <Tooltip label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}>
+            {(voiceVisible || voiceListening) && (
+              <Tooltip label={voiceListening ? t("composer.voiceStop") : voiceSupported ? t("composer.voiceInput") : t("composer.voiceUnsupported")}>
                 <button
                   type="button"
                   className={`composer__btn composer__btn--voice${voiceListening ? " composer__btn--voice-active" : ""}`}
                   onClick={toggleVoiceInput}
-                  disabled={disabled || readOnly || running || !voiceSupported}
+                  disabled={disabled || readOnly || running}
                   aria-label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}
                   aria-pressed={voiceListening}
                   title={voiceSupported ? undefined : t("composer.voiceUnsupported")}
