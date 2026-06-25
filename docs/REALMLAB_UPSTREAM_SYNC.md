@@ -26,10 +26,11 @@ These changes are product decisions and must survive every upstream merge:
 - User-facing desktop brand copy stays `MicroRealm Lab`; upstream `Reasonix`
   wording may remain only in internal compatibility paths, module names, or
   source comments where renaming would create unnecessary merge risk.
-- Internal desktop logo assets use the official `MicroRealm_Logo_Kit` SVGs:
-  `MicroRealm_Wordmark_Horizontal_Light.svg` for the wordmark and
-  `MicroRealm_M_Light.svg` for in-app symbol marks. Do not reintroduce custom
-  star/Reasonix-derived wordmarks during upstream merges.
+- Internal desktop logo assets use the official `MicroRealm_Logo_Kit` as their
+  base: the `MicroRealm` wordmark follows `MicroRealm_Wordmark_Horizontal_Light.svg`
+  and symbol marks follow `MicroRealm_M_Light.svg`. The desktop wordmark must
+  keep RealmLab's product extension: `MicroRealm` + blue four-point star + `Lab`.
+  Do not reintroduce upstream Reasonix-derived wordmarks during merges.
 - Default desktop appearance stays `light` theme + `slate` visual style. This
   is RealmLab's current palette and must remain the first-run/package default.
 - CLI build output stays `bin/realmlab` unless a dedicated rename plan changes
