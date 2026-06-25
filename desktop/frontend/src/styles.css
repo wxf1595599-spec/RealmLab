@@ -3035,7 +3035,7 @@ a[href] {
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 14px 24px color-mix(in srgb, #ff9a2f 28%, transparent));
+  filter: drop-shadow(0 14px 22px color-mix(in srgb, #0153e5 34%, transparent));
   margin-bottom: 22px;
 }
 .startup-splash__mark img {
@@ -3445,8 +3445,8 @@ a[href] {
 }
 
 .welcome {
-  --welcome-brand-width: 104px;
-  --welcome-brand-height: 104px;
+  --welcome-brand-width: 240px;
+  --welcome-brand-height: 56px;
   --welcome-brand-gap: 26px;
   width: min(100%, 600px);
   max-height: none;
@@ -3475,6 +3475,20 @@ a[href] {
   width: var(--welcome-brand-width);
   height: var(--welcome-brand-height);
   object-fit: contain;
+}
+
+:root[data-theme="dark"] .sidebar__brand-logo,
+:root[data-theme="dark"] .welcome__brand-logo {
+  filter: brightness(0) invert(1);
+  opacity: 0.94;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .sidebar__brand-logo,
+  :root:not([data-theme]) .welcome__brand-logo {
+    filter: brightness(0) invert(1);
+    opacity: 0.94;
+  }
 }
 .welcome__title {
   font-size: 22px;
@@ -3536,8 +3550,8 @@ a[href] {
 
 @container (max-height: 560px) {
   .welcome--brand {
-    --welcome-brand-width: 88px;
-    --welcome-brand-height: 88px;
+    --welcome-brand-width: 224px;
+    --welcome-brand-height: 52px;
     --welcome-brand-gap: 22px;
     transform: translateY(-16px);
   }
@@ -15646,7 +15660,6 @@ a[href] {
   height: 36px;
   align-self: flex-start;
   margin-bottom: 4px;
-  object-fit: contain;
 }
 .onboarding__title {
   font-size: 18px;
@@ -16083,8 +16096,8 @@ a[href] {
 
 .app-chrome__logo {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 78px;
+  max-height: 20px;
   object-fit: contain;
 }
 
@@ -19251,9 +19264,9 @@ a[href] {
 .sidebar__brand-logo {
   flex: 0 0 auto;
   display: block;
-  width: 32px;
+  width: 136px;
   height: 32px;
-  margin-left: 0;
+  margin-left: -21px;
   object-fit: contain;
   object-position: left center;
 }
@@ -19772,8 +19785,8 @@ a[href] {
 }
 
 :root[data-theme-style] .app-chrome__logo {
-  width: 22px;
-  height: 22px;
+  width: 76px;
+  max-height: 19px;
 }
 
 :root[data-theme-style] .app-chrome__separator {
@@ -22234,9 +22247,9 @@ a[href] {
 }
 
 .sidebar--workbench .sidebar__brand-logo--workbench {
-  width: 24px;
+  width: 118px;
   height: 24px;
-  margin-left: 0;
+  margin-left: -14px;
 }
 
 .sidebar--workbench .sidebar__brand svg {
@@ -24197,9 +24210,9 @@ a[href] {
 
 .app--creation .sidebar__brand-logo,
 :root[data-theme-style] .app--creation .sidebar__brand-logo {
-  width: 28px;
+  width: 118px;
   height: 28px;
-  margin-left: 0;
+  margin-left: -15px;
 }
 
 .app--creation .sidebar__new,

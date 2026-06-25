@@ -43,7 +43,7 @@ func assertRealmLabLogoIcon(t *testing.T, img image.Image, size int) {
 		t.Fatalf("app icon must be square, got %dx%d", bounds.Dx(), bounds.Dy())
 	}
 
-	darkCanvasPoints := []struct {
+	transparentCornerPoints := []struct {
 		name string
 		x    int
 		y    int
@@ -52,14 +52,26 @@ func assertRealmLabLogoIcon(t *testing.T, img image.Image, size int) {
 		{"top-right", bounds.Max.X - 1, bounds.Min.Y},
 		{"bottom-left", bounds.Min.X, bounds.Max.Y - 1},
 		{"bottom-right", bounds.Max.X - 1, bounds.Max.Y - 1},
+	}
+	for _, point := range transparentCornerPoints {
+		if !isTransparent(img.At(point.x, point.y)) {
+			t.Fatalf("%s corner must be transparent for the rounded app icon, got %s", point.name, hexColor(img.At(point.x, point.y)))
+		}
+	}
+
+	visibleEdgePoints := []struct {
+		name string
+		x    int
+		y    int
+	}{
 		{"top", bounds.Min.X + bounds.Dx()/2, bounds.Min.Y},
 		{"right", bounds.Max.X - 1, bounds.Min.Y + bounds.Dy()/2},
 		{"bottom", bounds.Min.X + bounds.Dx()/2, bounds.Max.Y - 1},
 		{"left", bounds.Min.X, bounds.Min.Y + bounds.Dy()/2},
 	}
-	for _, point := range darkCanvasPoints {
-		if !isDarkOpaque(img.At(point.x, point.y)) {
-			t.Fatalf("%s point must use RealmLab dark icon canvas, got %s", point.name, hexColor(img.At(point.x, point.y)))
+	for _, point := range visibleEdgePoints {
+		if !isDarkVisible(img.At(point.x, point.y)) {
+			t.Fatalf("%s edge must keep the RealmLab rounded icon canvas visible, got %s", point.name, hexColor(img.At(point.x, point.y)))
 		}
 	}
 
@@ -74,9 +86,14 @@ func assertRealmLabLogoIcon(t *testing.T, img image.Image, size int) {
 	}
 }
 
-func isDarkOpaque(colorValue color.Color) bool {
+func isTransparent(colorValue color.Color) bool {
+	_, _, _, a := rgba8(colorValue)
+	return a <= 0x10
+}
+
+func isDarkVisible(colorValue color.Color) bool {
 	r, g, b, a := rgba8(colorValue)
-	return a >= 0xf0 && r <= 45 && g <= 45 && b <= 45
+	return a >= 0xf0 && r <= 120 && g <= 120 && b <= 120
 }
 
 func isRealmLabOrange(colorValue color.Color) bool {
