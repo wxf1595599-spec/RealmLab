@@ -21,7 +21,7 @@ func TestDefaultMemoryCompilerEnabled(t *testing.T) {
 	}
 }
 
-func TestDefaultDesktopAppearanceAutoGraphite(t *testing.T) {
+func TestDefaultDesktopAppearanceLightSlate(t *testing.T) {
 	cfg := Default()
 	if got := cfg.DesktopTheme(); got != RealmLabDefaultDesktopTheme {
 		t.Fatalf("default desktop theme = %q, want %s", got, RealmLabDefaultDesktopTheme)

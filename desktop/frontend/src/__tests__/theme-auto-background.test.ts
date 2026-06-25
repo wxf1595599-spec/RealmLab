@@ -23,12 +23,12 @@ function ok(value: boolean, label: string) {
 console.log("\ntheme auto native background contract");
 
 ok(
-  themeSource.includes('export const REALMLAB_DEFAULT_THEME: Theme = "auto";'),
-  "RealmLab default theme stays automatic",
+  themeSource.includes('export const REALMLAB_DEFAULT_THEME: Theme = "light";'),
+  "RealmLab default theme stays light",
 );
 ok(
-  themeSource.includes('export const REALMLAB_DEFAULT_THEME_STYLE: ThemeStyle = "graphite";'),
-  "RealmLab default palette stays graphite",
+  themeSource.includes('export const REALMLAB_DEFAULT_THEME_STYLE: ThemeStyle = "slate";'),
+  "RealmLab default palette stays Slate",
 );
 ok(
   themeSource.includes('const AUTO_THEME_MEDIA_QUERY = "(prefers-color-scheme: light)";'),

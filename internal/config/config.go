@@ -74,8 +74,8 @@ const (
 // RealmLab desktop appearance defaults are product identity, not incidental UI
 // fallbacks. Keep these in sync with desktop/frontend/src/lib/theme.ts.
 const (
-	RealmLabDefaultDesktopTheme      = "auto"
-	RealmLabDefaultDesktopThemeStyle = "graphite"
+	RealmLabDefaultDesktopTheme      = "light"
+	RealmLabDefaultDesktopThemeStyle = "slate"
 )
 
 // UIConfig controls CLI presentation-only settings. Desktop appearance is kept in
@@ -190,8 +190,8 @@ func (c *Config) DesktopLanguage() string {
 	}
 }
 
-// DesktopTheme normalizes desktop.theme. New desktop users default to the OS
-// automatic graphite product look; an explicit auto/light/dark is preserved.
+// DesktopTheme normalizes desktop.theme. New desktop users default to the
+// RealmLab light Slate product look; an explicit auto/light/dark is preserved.
 func (c *Config) DesktopTheme() string {
 	switch strings.ToLower(strings.TrimSpace(c.Desktop.Theme)) {
 	case "auto":

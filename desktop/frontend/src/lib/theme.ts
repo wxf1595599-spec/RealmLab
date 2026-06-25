@@ -24,8 +24,8 @@ export type ThemeStyle = (typeof THEME_STYLES)[number];
 // RealmLab's product default palette. Keep these in sync with
 // internal/config/config.go so first paint, new installs, and packaged builds
 // all start from the same appearance.
-export const REALMLAB_DEFAULT_THEME: Theme = "auto";
-export const REALMLAB_DEFAULT_THEME_STYLE: ThemeStyle = "graphite";
+export const REALMLAB_DEFAULT_THEME: Theme = "light";
+export const REALMLAB_DEFAULT_THEME_STYLE: ThemeStyle = "slate";
 
 // Old style identifiers map to the closest new direction so settings stored
 // from previous versions still resolve to a valid value.
