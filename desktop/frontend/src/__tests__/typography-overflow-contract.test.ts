@@ -81,7 +81,8 @@ eq(
 eq(finalDeclaration(":root", "--sans"), "var(--font-ui)", "legacy sans alias stays synced with UI font");
 eq(finalDeclaration(':root[data-text-size="xxlarge"]', "--font-scale"), "1.32", "xxlarge has a real scale bump");
 ok(
-  (finalDeclaration(":root", "--statusbar-dock-height") ?? "").includes("var(--font-scale)"),
+  (finalDeclaration(":root", "--font-scale-effective") ?? "").includes("var(--font-scale)") &&
+    (finalDeclaration(":root", "--statusbar-dock-height") ?? "").includes("var(--font-scale-effective)"),
   "status bar dock height scales with interface text size",
 );
 ok(

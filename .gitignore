@@ -30,6 +30,11 @@ mem.prof
 /desktop/frontend/wailsjs/
 /desktop/frontend/package.json.md5
 
+# Local RealmLab app/runtime copies
+/.local-app/
+/.realmlab-serve.log
+/.realmlab-serve.pid
+
 # Environment / local config (reasonix.example.toml is the shared template)
 .env
 .env.local

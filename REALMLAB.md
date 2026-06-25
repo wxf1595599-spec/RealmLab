@@ -7,8 +7,9 @@ RealmLab is based on the latest default branch of
 
 - Repository: https://github.com/esengine/DeepSeek-Reasonix
 - Branch: `main-v2`
-- Commit: `b193d42`
-- Local project root: `/Users/nagi/Desktop/Project/RealmLab`
+- Initial RealmLab fork commit: `b193d42`
+- Latest merged upstream commit: `6bbb66e`
+- Local project root: `/Users/ustinian/Documents/RealmLab IDE/RealmLab`
 
 The upstream module path is intentionally still `reasonix` for now. It is used
 throughout Go `internal` imports and should only be renamed as a dedicated
@@ -66,3 +67,4 @@ Keep early RealmLab changes small and reversible:
 - Avoid broad package-path renames before tests and release packaging are green.
 - Treat macOS and Windows packaging as release targets, not cross-compiled Wails
   artifacts.
+- Follow `docs/REALMLAB_UPSTREAM_SYNC.md` for every upstream merge.
