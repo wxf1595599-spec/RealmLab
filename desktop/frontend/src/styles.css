@@ -19253,20 +19253,20 @@ a[href] {
 
 .sidebar__brand {
   display: flex;
-  flex: 0 0 48px;
+  flex: 0 0 56px;
   align-items: center;
-  min-height: 48px;
-  padding: 2px var(--sidebar-entry-content-inset);
-  margin-bottom: 10px;
+  min-height: 56px;
+  padding: 6px 18px 4px;
+  margin-bottom: 8px;
   color: var(--fg);
 }
 
 .sidebar__brand-logo {
   flex: 0 0 auto;
   display: block;
-  width: 250px;
-  height: 36px;
-  margin-left: -8px;
+  width: 232px;
+  height: 40px;
+  margin-left: -2px;
   object-fit: contain;
   object-position: left center;
 }
@@ -22236,10 +22236,10 @@ a[href] {
 }
 
 :root[data-theme-style] .sidebar--workbench .sidebar__brand {
-  flex: 0 0 38px;
-  min-height: 38px;
-  padding: 0 12px;
-  margin-bottom: 0;
+  flex: 0 0 48px;
+  min-height: 48px;
+  padding: 4px 18px;
+  margin-bottom: 8px;
 }
 
 .sidebar--workbench .sidebar__brand--workbench {
@@ -22247,9 +22247,9 @@ a[href] {
 }
 
 .sidebar--workbench .sidebar__brand-logo--workbench {
-  width: 218px;
-  height: 32px;
-  margin-left: -6px;
+  width: 224px;
+  height: 38px;
+  margin-left: -2px;
 }
 
 .sidebar--workbench .sidebar__brand svg {
