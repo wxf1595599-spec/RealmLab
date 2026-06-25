@@ -38,7 +38,7 @@ import (
 // the canary line and a stable build polls latest; the two never cross.
 const (
 	r2Base         = "https://dl.reasonix.io"
-	ghReleasesBase = "https://github.com/esengine/reasonix/releases"
+	ghReleasesBase = "https://github.com/esengine/DeepSeek-Reasonix/releases"
 	httpTimeout    = 15 * time.Second
 )
 
@@ -216,7 +216,7 @@ func defaultUpdateCacheBaseDir() (string, error) {
 	if err != nil {
 		base = os.TempDir()
 	}
-	return filepath.Join(base, "Reasonix", "updates"), nil
+	return filepath.Join(base, "RealmLab", "updates"), nil
 }
 
 func updateCacheDir() (string, error) {
@@ -245,7 +245,7 @@ func assetFileName(asset update.Asset, version string) string {
 		}
 	}
 	clean := strings.NewReplacer("/", "-", "\\", "-", ":", "-", " ", "-").Replace(version)
-	return "Reasonix-" + clean + "-" + update.CurrentPlatform() + ".update"
+	return "RealmLab-" + clean + "-" + update.CurrentPlatform() + ".update"
 }
 
 func writeAtomic(path string, data []byte, mode os.FileMode) error {
@@ -562,7 +562,7 @@ func extractBinary(targz []byte, name string) ([]byte, error) {
 // applyLinux replaces the running binary with the one inside the downloaded
 // tar.gz; the caller relaunches afterwards.
 func applyLinux(targz []byte) error {
-	bin, err := extractBinary(targz, "reasonix-desktop")
+	bin, err := extractBinary(targz, "RealmLab")
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Check, Eye, FileText, Folder, Gauge, List, MessageSquare, MoreHorizontal, Search, Shield, ShieldAlert, ShieldCheck, SlidersHorizontal, Square, Target, Trash2, X } from "lucide-react";
+import { ArrowUp, Check, Eye, FileText, Folder, Gauge, List, MessageSquare, Mic, MoreHorizontal, Search, Shield, ShieldAlert, ShieldCheck, SlidersHorizontal, Square, Target, Trash2, X } from "lucide-react";
 import { asArray } from "../lib/array";
 import { filterAtMatches } from "../lib/atMatches";
 import { DedupIndex, sha256 } from "../lib/attachDedup";
@@ -77,6 +77,36 @@ type ComposerDraft = {
 type WebkitFileEntry = {
   isDirectory?: boolean;
 };
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+type SpeechRecognitionLike = EventTarget & {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onend: ((event: Event) => void) | null;
+  onerror: ((event: Event & { error?: string }) => void) | null;
+  onresult: ((event: Event & { resultIndex?: number; results?: ArrayLike<{ isFinal?: boolean; 0?: { transcript?: string } }> }) => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+};
+
+function speechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
+}
+
+function speechRecognitionLang(locale: string): string {
+  if (locale === "zh-TW") return "zh-TW";
+  if (locale.startsWith("zh")) return "zh-CN";
+  return "en-US";
+}
 
 const DEFAULT_COMPOSER_DRAFT_KEY = "__default_composer_draft__";
 
@@ -382,6 +412,7 @@ export function Composer({
   collaborationMode,
   toolApprovalMode,
   tokenMode,
+  studentModeEnabled = false,
   goal,
   cwd,
   modelLabel,
@@ -414,6 +445,7 @@ export function Composer({
   collaborationMode: CollaborationMode;
   toolApprovalMode: ToolApprovalMode;
   tokenMode: TokenMode;
+  studentModeEnabled?: boolean;
   goal?: string;
   cwd?: string;
   modelLabel: string;
@@ -478,6 +510,7 @@ export function Composer({
   const [loadingPastChats, setLoadingPastChats] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [composerPrompt, setComposerPrompt] = useState<string | null>(null);
+  const [voiceListening, setVoiceListening] = useState(false);
   // Prompt history navigation (plain ↑/↓)
   // Use refs for values read inside async closures to avoid stale captures
   // on rapid key presses (the React closure trap).
@@ -509,6 +542,9 @@ export function Composer({
   cwdRef.current = cwd;
   const attachmentDedupRef = useRef(new DedupIndex());
   const attachmentDedupKeysRef = useRef<Record<string, AttachmentDedupKey>>({});
+  const voiceRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceInsertRef = useRef({ prefix: "", suffix: "" });
+  const voiceFinalTranscriptRef = useRef("");
   const draftKey = sessionKey || tabId || DEFAULT_COMPOSER_DRAFT_KEY;
   const draftsBySessionRef = useRef<Record<string, ComposerDraft>>({});
   const activeDraftKeyRef = useRef(draftKey);
@@ -584,6 +620,11 @@ export function Composer({
   };
 
   useEffect(() => () => clearNativeClipboardPasteTimer(), []);
+
+  useEffect(() => () => {
+    voiceRecognitionRef.current?.abort();
+    voiceRecognitionRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (wasRunning.current && !running && text.trim() === "") {
@@ -1336,6 +1377,95 @@ export function Composer({
     if (typeof restored === "string") setTextCaretEnd(restored);
   };
 
+  const voiceSupported = useMemo(() => Boolean(speechRecognitionCtor()), []);
+
+  const stopVoiceInput = useCallback(() => {
+    voiceRecognitionRef.current?.stop();
+  }, []);
+
+  const toggleVoiceInput = useCallback(() => {
+    if (voiceListening) {
+      stopVoiceInput();
+      return;
+    }
+    const Ctor = speechRecognitionCtor();
+    if (!Ctor) {
+      showToast(t("composer.voiceUnsupported"), "warn");
+      return;
+    }
+    const currentText = textRef.current;
+    const node = taRef.current;
+    const start = node?.selectionStart ?? currentText.length;
+    const end = node?.selectionEnd ?? currentText.length;
+    voiceInsertRef.current = {
+      prefix: currentText.slice(0, start),
+      suffix: currentText.slice(end),
+    };
+    voiceFinalTranscriptRef.current = "";
+
+    const recognition = new Ctor();
+    recognition.lang = speechRecognitionLang(locale);
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      let nextFinal = voiceFinalTranscriptRef.current;
+      let interim = "";
+      const results = event.results;
+      const resultIndex = event.resultIndex ?? 0;
+      if (!results) return;
+      for (let i = resultIndex; i < results.length; i++) {
+        const result = results[i];
+        const transcript = String(result?.[0]?.transcript ?? "");
+        if (!transcript) continue;
+        if (result?.isFinal) nextFinal += transcript;
+        else interim += transcript;
+      }
+      voiceFinalTranscriptRef.current = nextFinal;
+      const combined = `${nextFinal}${interim}`;
+      const nextText = `${voiceInsertRef.current.prefix}${combined}${voiceInsertRef.current.suffix}`;
+      setText(nextText);
+      requestAnimationFrame(() => {
+        const target = taRef.current;
+        if (!target) return;
+        const caret = voiceInsertRef.current.prefix.length + combined.length;
+        target.focus();
+        target.setSelectionRange(caret, caret);
+      });
+    };
+    recognition.onerror = (event) => {
+      const code = event.error ?? "";
+      if (code === "aborted") return;
+      if (code === "not-allowed" || code === "service-not-allowed") {
+        showToast(t("composer.voicePermissionDenied"), "warn");
+        return;
+      }
+      if (code !== "no-speech") {
+        showToast(t("composer.voiceStartFailed"), "warn");
+      }
+    };
+    recognition.onend = () => {
+      voiceRecognitionRef.current = null;
+      setVoiceListening(false);
+    };
+
+    try {
+      voiceRecognitionRef.current = recognition;
+      setVoiceListening(true);
+      recognition.start();
+    } catch (error) {
+      console.warn("[composer] failed to start voice input", error);
+      voiceRecognitionRef.current = null;
+      setVoiceListening(false);
+      showToast(t("composer.voiceStartFailed"), "warn");
+    }
+  }, [locale, showToast, stopVoiceInput, t, voiceListening]);
+
+  useEffect(() => {
+    if (!running) return;
+    if (voiceListening) stopVoiceInput();
+  }, [running, stopVoiceInput, voiceListening]);
+
   const pickCommand = (c: CommandInfo) => setTextCaretEnd("/" + c.name + " ");
 
   const activePastedBlocks = pastedBlocks.filter((block) => text.includes(block.label));
@@ -1838,6 +1968,11 @@ export function Composer({
   const effortLevels = asArray(effort?.levels);
   const currentEffort = effort?.current || "auto";
   const hasEffort = Boolean(effort?.supported && effortLevels.length > 0);
+  const studentApprovalMode = studentModeEnabled ? (toolApprovalMode === "yolo" ? "yolo" : "ask") : toolApprovalMode;
+  useEffect(() => {
+    if (!studentModeEnabled || !hasEffort || currentEffort === "auto") return;
+    onSetEffort("auto");
+  }, [currentEffort, hasEffort, onSetEffort, studentModeEnabled]);
   const chooseEffortLevel = (level: string) => {
     closeMoreMenu(() => {
       if (level !== currentEffort) onSetEffort(level);
@@ -1935,7 +2070,7 @@ export function Composer({
         className="composer-access-menu composer-more-menu"
         align="end"
       >
-        {hasEffort && (
+        {hasEffort && !studentModeEnabled && (
           <div className="composer-access-menu__section">
             <div className="composer-access-menu__label">{t("status.effortTitle")}</div>
             <div className="composer-more-menu__items" role="listbox" aria-label={t("status.effortTitle")}>
@@ -2225,11 +2360,11 @@ export function Composer({
           onDragLeave={onDragLeave}
         >
           <span className="composer__caret">{shellModeActive ? "$" : "›"}</span>
-          <textarea
+        <textarea
             id="composer-input"
             ref={taRef}
             className="composer__input"
-            aria-label={t("composer.placeholder")}
+            aria-label={studentModeEnabled ? t("composer.studentModePlaceholder") : t("composer.placeholder")}
             value={text}
             onChange={(e) => {
               resetPromptHistoryNavigation();
@@ -2250,9 +2385,9 @@ export function Composer({
               lastCompositionEndAt.current = Date.now();
             }}
             style={textareaStyle}
-            placeholder={readOnly ? t("composer.readOnlyChannel") : disabled ? t("common.loading") : goalModeOn && !activeGoal ? t("composer.goalInputPlaceholder") : t("composer.placeholder")}
+            placeholder={readOnly ? t("composer.readOnlyChannel") : disabled ? t("common.loading") : goalModeOn && !activeGoal ? t("composer.goalInputPlaceholder") : studentModeEnabled ? t("composer.studentModePlaceholder") : t("composer.placeholder")}
             rows={1}
-            disabled={disabled || readOnly}
+            disabled={disabled || readOnly || voiceListening}
           />
           {composerPrompt && (
             <span className="composer__prompt" role="status">
@@ -2264,7 +2399,7 @@ export function Composer({
               <button
                 className="composer__btn composer__btn--send"
                 onClick={submit}
-                disabled={submitting || pendingPaste > 0 || ((!text.trim() && attachments.length === 0 && workspaceRefs.length === 0) && !(goalModeOn && !activeGoal)) || disabled || submitDisabled || readOnly}
+                disabled={voiceListening || submitting || pendingPaste > 0 || ((!text.trim() && attachments.length === 0 && workspaceRefs.length === 0) && !(goalModeOn && !activeGoal)) || disabled || submitDisabled || readOnly}
               >
                 <ArrowUp size={16} />
               </button>
@@ -2351,52 +2486,60 @@ export function Composer({
               )}
             </div>
             <div className="composer-meta__control composer-meta__control--approval">
-              <div className="composer-modebar composer-modebar--approval" data-mode={toolApprovalMode} title={t("composer.accessMenuTitle")}>
+              <div
+                className={`composer-modebar composer-modebar--approval${studentModeEnabled ? " composer-modebar--student" : ""}`}
+                data-mode={studentApprovalMode}
+                title={t("composer.accessMenuTitle")}
+              >
                 <span className="composer-modebar__thumb" aria-hidden="true" />
                 <button
                   type="button"
-                  className={`composer-modebar__item composer-modebar__item--ask${toolApprovalMode === "ask" ? " composer-modebar__item--active" : ""}`}
+                  className={`composer-modebar__item composer-modebar__item--ask${studentApprovalMode === "ask" ? " composer-modebar__item--active" : ""}`}
                   onClick={() => chooseApprovalMode("ask")}
                   disabled={disabled}
-                  aria-pressed={toolApprovalMode === "ask"}
+                  aria-pressed={studentApprovalMode === "ask"}
                   title={t("composer.accessAskTitle")}
                 >
                   <Shield size={14} />
-                  <span>{t("composer.modeAsk")}</span>
+                  <span>{studentModeEnabled ? t("composer.studentModeAsk") : t("composer.modeAsk")}</span>
                 </button>
+                {!studentModeEnabled && (
+                  <button
+                    type="button"
+                    className={`composer-modebar__item composer-modebar__item--auto${toolApprovalMode === "auto" ? " composer-modebar__item--active" : ""}`}
+                    onClick={() => chooseApprovalMode("auto")}
+                    disabled={disabled}
+                    aria-pressed={toolApprovalMode === "auto"}
+                    title={t("composer.accessAutoTitle")}
+                  >
+                    <ShieldCheck size={14} />
+                    <span>{t("composer.modeNormal")}</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  className={`composer-modebar__item composer-modebar__item--auto${toolApprovalMode === "auto" ? " composer-modebar__item--active" : ""}`}
-                  onClick={() => chooseApprovalMode("auto")}
-                  disabled={disabled}
-                  aria-pressed={toolApprovalMode === "auto"}
-                  title={t("composer.accessAutoTitle")}
-                >
-                  <ShieldCheck size={14} />
-                  <span>{t("composer.modeNormal")}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`composer-modebar__item composer-modebar__item--yolo${toolApprovalMode === "yolo" ? " composer-modebar__item--active" : ""}`}
+                  className={`composer-modebar__item composer-modebar__item--yolo${studentApprovalMode === "yolo" ? " composer-modebar__item--active" : ""}`}
                   onClick={() => chooseApprovalMode("yolo")}
                   disabled={disabled}
-                  aria-pressed={toolApprovalMode === "yolo"}
+                  aria-pressed={studentApprovalMode === "yolo"}
                   title={t("composer.accessYoloTitle")}
                 >
                   <ShieldAlert size={14} />
-                  <span>{t("composer.modeYolo")}</span>
+                  <span>{studentModeEnabled ? t("composer.studentModeYolo") : t("composer.modeYolo")}</span>
                 </button>
               </div>
             </div>
-            <div className="composer-meta__control composer-meta__control--model">
-              <ModelSwitcher label={modelLabel} tabId={tabId} onPick={onSwitchModel} />
-            </div>
-            {hasEffort && (
+            {!studentModeEnabled && (
+              <div className="composer-meta__control composer-meta__control--model">
+                <ModelSwitcher label={modelLabel} tabId={tabId} onPick={onSwitchModel} />
+              </div>
+            )}
+            {hasEffort && !studentModeEnabled && (
               <div className="composer-meta__control composer-meta__control--effort">
                 <EffortSwitcher effort={effort} disabled={running} onPick={onSetEffort} />
               </div>
             )}
-            {hasEffort && (
+            {hasEffort && !studentModeEnabled && (
               <div className="composer-meta__control composer-meta__control--more">
                 <Tooltip label={t("composer.moreControls")} disabled={moreMenuOpen || moreMenuClosing}>
                   <button
@@ -2416,6 +2559,21 @@ export function Composer({
                 </Tooltip>
               </div>
             )}
+          </div>
+          <div className="composer-meta__actions">
+            <Tooltip label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}>
+              <button
+                type="button"
+                className={`composer__btn composer__btn--voice${voiceListening ? " composer__btn--voice-active" : ""}`}
+                onClick={toggleVoiceInput}
+                disabled={disabled || readOnly || running || !voiceSupported}
+                aria-label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}
+                aria-pressed={voiceListening}
+                title={voiceSupported ? undefined : t("composer.voiceUnsupported")}
+              >
+                <Mic size={16} />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

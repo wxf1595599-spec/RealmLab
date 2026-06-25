@@ -3,6 +3,7 @@ import { asArray } from "../lib/array";
 import { app, openExternal } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { mcpServerLifecycleActions, mcpServerRetryableFromAvailableList } from "../lib/mcpServerLifecycle";
+import { rememberSkillModeProfile } from "../lib/skillModeProfiles";
 import type { CapabilitiesView, MCPServerInput, ServerView, SkillRootSkillView, SkillRootView, SkillsSettingsView, SkillView, TabMeta } from "../lib/types";
 import { InlineConfirmButton } from "./InlineConfirmButton";
 import { ResizableDrawer } from "./ResizableDrawer";
@@ -1650,7 +1651,7 @@ export function MCPServersSettingsPage() {
 
 // SkillsSettingsPage is a self-contained skills management page embedded inside
 // the settings centre.
-export function SkillsSettingsPage() {
+export function SkillsSettingsPage({ studentModeEnabled = false }: { studentModeEnabled?: boolean }) {
 	const t = useT();
 	const [snapshotKey, setSnapshotKey] = useState("");
 	const [view, setView] = useState<SkillsSettingsView | null>(null);
@@ -1674,8 +1675,9 @@ export function SkillsSettingsPage() {
 		}
 		const next = normalizeSkillsSettingsView(await app.SkillsSettings().catch(() => ({ skills: [], skillRoots: [] })));
 		skillsSettingsSnapshot = { key, value: next };
+		rememberSkillModeProfile(studentModeEnabled, next);
 		setView(next);
-	}, []);
+	}, [studentModeEnabled]);
 	useEffect(() => { void reload(); }, [reload]);
 
 	const mutate = async (fn: () => Promise<unknown>) => {

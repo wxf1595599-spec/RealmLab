@@ -118,6 +118,10 @@ type Options struct {
 	// terminal. Headless/bot frontends pass a positive value so an unanswered
 	// prompt can't wedge the session indefinitely (#4626, #4402).
 	ApprovalTimeout time.Duration
+	// StudentMode enables an education-oriented teacher/student tone in the
+	// system prompt for this session only. It is a desktop runtime mode, not a
+	// persisted config flag.
+	StudentMode bool
 }
 
 // Build loads config, resolves the model(s), and returns a Controller wrapping a
@@ -227,8 +231,12 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	if st, ok := outputstyle.Resolve(cfg.Agent.OutputStyle, outputstyle.Dirs()); ok {
 		sysPrompt = outputstyle.Apply(sysPrompt, st)
 	}
+	sysPrompt = config.RealmLabIdentityPolicy + "\n\n" + sysPrompt
 	sysPrompt += "\n\n" + config.UserDecisionPolicy
 	sysPrompt += "\n\n" + config.LanguagePolicy
+	if opts.StudentMode {
+		sysPrompt += "\n\n" + config.StudentModeEducationPolicy
+	}
 	if tokenEconomy {
 		sysPrompt += "\n\n" + tokenEconomyPrompt
 	}

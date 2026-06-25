@@ -882,6 +882,7 @@ func (a *App) rebuild() error {
 		SessionDir:               tabSessionDir(tab),
 		EffortOverride:           cloneStringPtr(tab.effort),
 		TokenMode:                currentTabTokenMode(tab),
+		StudentMode:              tab.studentMode,
 		SharedHost:               sharedHost,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 	})
@@ -1877,6 +1878,34 @@ func (a *App) SetAgentParams(temperature float64, maxSteps int, plannerMaxSteps 
 		c.Agent.SystemPrompt = systemPrompt
 		return nil
 	})
+}
+
+func (a *App) SetStudentMode(enabled bool) error {
+	if a.ctx == nil {
+		return nil
+	}
+	a.mu.Lock()
+	tab := a.activeTabLocked()
+	if tab == nil {
+		a.mu.Unlock()
+		return fmt.Errorf("no active tab")
+	}
+	if controllerHasActiveRuntimeWork(tab.Ctrl) {
+		a.mu.Unlock()
+		return rebuildControllerActiveWorkError("student mode")
+	}
+	if tab.studentMode == enabled {
+		a.mu.Unlock()
+		return nil
+	}
+	tab.studentMode = enabled
+	a.saveTabsLocked()
+	ctrlReady := tab.Ctrl != nil
+	a.mu.Unlock()
+	if !ctrlReady {
+		return nil
+	}
+	return a.rebuild()
 }
 
 func (a *App) SetColdResumePrune(enabled bool) error {

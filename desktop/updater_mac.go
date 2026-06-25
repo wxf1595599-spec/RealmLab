@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const macBundleID = "com.wails.reasonix-desktop"
+const macBundleID = "com.wails.realmlab-desktop"
 
 func applyMac(zipPath string) error {
 	if !macSelfUpdateAllowed() {
@@ -20,7 +20,7 @@ func applyMac(zipPath string) error {
 	if err != nil {
 		return err
 	}
-	staging, err := os.MkdirTemp("", "reasonix-mac-update-*")
+	staging, err := os.MkdirTemp("", "realmlab-mac-update-*")
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func applyMac(zipPath string) error {
 	if err := verifyMacApp(nextApp); err != nil {
 		return err
 	}
-	script := filepath.Join(staging, "install-reasonix-update.sh")
+	script := filepath.Join(staging, "install-realmlab-update.sh")
 	body := fmt.Sprintf(`#!/bin/sh
 set -eu
 old_app=%q
@@ -93,7 +93,7 @@ func currentMacAppBundle() (string, error) {
 }
 
 func findMacApp(root string) (string, error) {
-	direct := filepath.Join(root, "Reasonix.app")
+	direct := filepath.Join(root, "RealmLab.app")
 	if _, err := os.Stat(filepath.Join(direct, "Contents", "Info.plist")); err == nil {
 		return direct, nil
 	}

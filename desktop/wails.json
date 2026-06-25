@@ -1,19 +1,19 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "reasonix-desktop",
-  "outputfilename": "reasonix-desktop",
-  "frontend:install": "pnpm install",
-  "frontend:build": "pnpm build",
-  "frontend:dev:watcher": "pnpm dev",
+  "name": "realmlab-desktop",
+  "outputfilename": "RealmLab",
+  "frontend:install": "corepack pnpm install",
+  "frontend:build": "corepack pnpm build",
+  "frontend:dev:watcher": "corepack pnpm dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "esengine"
+    "name": "RealmLab"
   },
   "info": {
-    "companyName": "Reasonix",
-    "productName": "Reasonix",
-    "productVersion": "0.0.0",
-    "copyright": "Copyright © 2026 Reasonix Contributors",
-    "comments": "Reasonix desktop — a Wails shell around the Go kernel."
+    "companyName": "RealmLab",
+    "productName": "RealmLab",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright © 2026 RealmLab Contributors",
+    "comments": "RealmLab desktop, based on the Reasonix Go kernel."
   }
 }

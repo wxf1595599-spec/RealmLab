@@ -284,6 +284,7 @@ export interface AppBindings {
   SetExpandThinking(on: boolean): Promise<void>;
   MigrateDesktopPreferences(language: string, theme: string, style: string): Promise<void>;
   SetAgentParams(temperature: number, maxSteps: number, plannerMaxSteps: number, systemPrompt: string): Promise<void>;
+  SetStudentMode(enabled: boolean): Promise<void>;
   SetColdResumePrune(enabled: boolean): Promise<void>;
   SetReasoningLanguage(lang: string): Promise<void>;
   SetTrayLocale(locale: "en" | "zh" | "zh-TW"): Promise<void>;
@@ -689,19 +690,9 @@ function makeMockApp(): AppBindings {
   let capSkillRoots: SkillRootView[] = [
     { dir: "~/projects/reasonix/.reasonix/skills", scope: "project", priority: 1, status: "missing", configured: false, removable: true, skills: 0 },
     {
-      dir: "~/my-skills",
-      scope: "custom",
-      priority: 5,
-      status: "ok",
-      configured: true,
-      removable: true,
-      skills: 1,
-      skillItems: [{ name: "review", description: "Review the staged diff", scope: "custom", runAs: "inline" }],
-    },
-    {
       dir: "~/.reasonix/skills",
       scope: "global",
-      priority: 6,
+      priority: 5,
       status: "ok",
       configured: false,
       removable: true,
@@ -807,7 +798,7 @@ function makeMockApp(): AppBindings {
       noProxy: "",
       proxy: { type: "socks5", server: "127.0.0.1", port: 7890, username: "", password: "" },
     },
-    agent: { temperature: 0.2, maxSteps: 0, plannerMaxSteps: 0, systemPrompt: "You are Reasonix, a coding agent.", coldResumePrune: true, reasoningLanguage: "auto" },
+    agent: { temperature: 0.2, maxSteps: 0, plannerMaxSteps: 0, systemPrompt: "You are RealmLab, a coding agent.", coldResumePrune: true, reasoningLanguage: "auto" },
     bot: {
       enabled: !freshMock,
       model: "",
@@ -2656,6 +2647,7 @@ function makeMockApp(): AppBindings {
     async SetAgentParams(temperature: number, maxSteps: number, plannerMaxSteps: number, systemPrompt: string) {
       settings.agent = { ...settings.agent, temperature, maxSteps, plannerMaxSteps, systemPrompt };
     },
+    async SetStudentMode(_enabled: boolean) {},
     async SetColdResumePrune(enabled: boolean) {
       settings.agent = { ...settings.agent, coldResumePrune: enabled };
     },

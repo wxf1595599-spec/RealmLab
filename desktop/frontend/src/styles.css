@@ -35,20 +35,22 @@
   --fg-dim: #c0c4cc;
   --fg-faint: #858b96;
   --font-scale: 1;
-  --text-2xs: calc(10px * var(--font-scale));
-  --text-xs: calc(11px * var(--font-scale));
-  --text-sm: calc(12px * var(--font-scale));
-  --text-md: calc(13px * var(--font-scale));
-  --text-base: calc(14px * var(--font-scale));
-  --text-lg: calc(15px * var(--font-scale));
-  --text-xl: calc(18px * var(--font-scale));
+  --student-font-scale: 1;
+  --font-scale-effective: calc(var(--font-scale) * var(--student-font-scale));
+  --text-2xs: calc(10px * var(--font-scale-effective));
+  --text-xs: calc(11px * var(--font-scale-effective));
+  --text-sm: calc(12px * var(--font-scale-effective));
+  --text-md: calc(13px * var(--font-scale-effective));
+  --text-base: calc(14px * var(--font-scale-effective));
+  --text-lg: calc(15px * var(--font-scale-effective));
+  --text-xl: calc(18px * var(--font-scale-effective));
   --font-caption: var(--text-xs);
   --font-code: var(--text-sm);
   --font-content: var(--text-base);
   --font-control: var(--text-md);
   --font-control-small: var(--text-sm);
   --font-status: var(--font-control-small);
-  --statusbar-dock-height: max(30px, calc(28px * var(--font-scale)));
+  --statusbar-dock-height: max(30px, calc(28px * var(--font-scale-effective)));
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei",
     "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
@@ -1907,6 +1909,38 @@ a[href] {
   min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.app--student-mode {
+  --student-font-scale: 1.08;
+}
+
+.app--student-mode .sidebar,
+.app--student-mode .topicbar,
+.app--student-mode .transcript,
+.app--student-mode .composer-wrap,
+.app--student-mode .workbench-dock {
+  font-size: 15px;
+}
+
+.app--student-mode .topicbar__title-input {
+  font-size: 16px;
+}
+
+.app--student-mode .topicbar__action-btn {
+  font-size: 13.5px;
+}
+
+.app--student-mode .composer-modebar__item {
+  font-size: 13px;
+  line-height: 15px;
+}
+
+.app--student-mode .warm-collapse,
+.app--student-mode .warm-turn__head,
+.app--student-mode .warm-turn__assistant,
+.app--student-mode .notice-line {
+  font-size: 13.5px;
 }
 
 .layout {
@@ -5198,6 +5232,35 @@ a[href] {
   cursor: default;
   transform: none;
 }
+.composer__btn--voice {
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg-dim);
+  box-shadow: var(--app-graphite-shadow);
+}
+.composer__btn--voice:not(:disabled):hover {
+  color: var(--fg);
+  border-color: var(--button-border-hover);
+  transform: translateY(-1px);
+}
+.composer__btn--voice:not(:disabled):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.composer__btn--voice:disabled {
+  background: var(--bg-soft);
+  color: var(--control-disabled-fg);
+  border-color: var(--border-soft);
+  cursor: default;
+  transform: none;
+}
+.composer__btn--voice-active,
+.composer__btn--voice-active:not(:disabled):hover,
+.composer__btn--voice-active:not(:disabled):focus-visible {
+  border-color: color-mix(in srgb, var(--control-primary-bg) 76%, #000);
+  background: var(--control-primary-bg);
+  color: var(--control-primary-fg);
+}
 .composer-meta {
   display: flex;
   align-items: center;
@@ -5220,6 +5283,14 @@ a[href] {
   min-width: 0;
   flex: 1 1 auto;
   margin-left: 0;
+}
+
+.composer-meta__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .composer-meta--has-intent-chip .composer-meta__params {
@@ -5323,6 +5394,36 @@ a[href] {
   --composer-modebar-active-bg: var(--mode-yolo-bg);
   --composer-modebar-active-border: var(--mode-yolo-border);
   --composer-modebar-active-fg: var(--mode-yolo-fg);
+}
+
+.composer-modebar--student {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 192px;
+}
+
+.composer-modebar--student .composer-modebar__thumb {
+  width: calc((100% - 4px) / 2);
+}
+
+.composer-modebar--student[data-mode="yolo"] {
+  --composer-modebar-index: 1;
+}
+
+.composer-modebar--student .composer-modebar__item {
+  gap: 7px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.composer-modebar--student .composer-modebar__item svg {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-0.5px);
+}
+
+.composer-modebar--student .composer-modebar__item span {
+  line-height: 1;
 }
 
 .composer-modebar__thumb {
@@ -10926,6 +11027,10 @@ a[href] {
   width: min(1360px, calc(100vw - 96px));
 }
 
+.settings-modal--student {
+  width: min(1100px, calc(100vw - 96px));
+}
+
 /* ── settings centre layout ─────────────────────────────────────────────────── */
 .settings-center {
   display: grid;
@@ -10933,6 +11038,10 @@ a[href] {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.settings-modal--student .settings-center {
+  grid-template-columns: 180px minmax(0, 1fr);
 }
 
 .settings-center__nav {
@@ -16708,6 +16817,12 @@ a[href] {
   background: var(--bg-elev);
 }
 
+.topicbar__chrome-btn--workspace {
+  border-color: var(--border);
+  background: var(--bg-elev);
+  color: var(--fg-dim);
+}
+
 .topicbar__chrome-btn--active {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
@@ -16895,6 +17010,18 @@ a[href] {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
   background: color-mix(in srgb, var(--accent) 10%, var(--bg-elev));
+}
+
+.topicbar__action-btn--student-active,
+.topicbar__action-btn--student-active:hover:not(:disabled),
+.topicbar__action-btn--student-active:focus-visible:not(:disabled) {
+  color: #fff;
+  border-color: #2563eb;
+  background: #2563eb;
+}
+
+.topicbar__action-btn--student-active:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #2563eb 28%, transparent);
 }
 
 .topicbar__export {
@@ -20482,6 +20609,12 @@ a[href] {
   background: var(--bg-elev-2);
 }
 
+:root[data-theme-style] .topicbar__chrome-btn--workspace {
+  border-color: var(--border);
+  background: var(--bg-elev);
+  box-shadow: var(--app-graphite-shadow);
+}
+
 :root[data-theme-style] .topicbar__chrome-btn--active {
   color: var(--fg-dim);
   border-color: var(--border);
@@ -20565,6 +20698,18 @@ a[href] {
   background: var(--bg-elev-2);
 }
 
+:root[data-theme-style] .topicbar__action-btn--student-active,
+:root[data-theme-style] .topicbar__action-btn--student-active:hover:not(:disabled),
+:root[data-theme-style] .topicbar__action-btn--student-active:focus-visible:not(:disabled),
+.app--creation .topicbar__actions .topicbar__action-btn--student-active,
+.app--creation .topicbar__actions .topicbar__action-btn--student-active:hover:not(:disabled),
+.app--creation .topicbar__actions .topicbar__action-btn--student-active:focus-visible:not(:disabled) {
+  color: #fff;
+  border-color: #2563eb;
+  background: #2563eb;
+  box-shadow: none;
+}
+
 :root[data-theme-style] .layout--workbench-chrome-hidden .topicbar,
 :root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn,
 :root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn,
@@ -20597,6 +20742,13 @@ a[href] {
 :root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn:focus-visible:not(.topicbar__chrome-btn--blocked) {
   border-color: transparent;
   background: transparent;
+}
+
+:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn--workspace,
+:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn--workspace:hover:not(.topicbar__chrome-btn--blocked),
+:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn--workspace:focus-visible:not(.topicbar__chrome-btn--blocked) {
+  border-color: var(--border);
+  background: var(--bg-elev);
 }
 
 :root[data-theme-style] .banner--update {
@@ -22726,6 +22878,10 @@ a[href] {
   gap: 6px;
 }
 
+.app--student-mode .sidebar--workbench .sidebar__utility-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .sidebar--workbench .sidebar__utility-row .tooltip-trigger {
   min-width: 0;
 }
@@ -22750,6 +22906,16 @@ a[href] {
 .sidebar--workbench .sidebar__utility-button svg {
   flex: 0 0 auto;
   stroke-width: 1.9;
+}
+
+.app--student-mode .sidebar--workbench .sidebar__utility-button {
+  height: 34px;
+  padding: 0;
+}
+
+.app--student-mode .sidebar--workbench .sidebar__utility-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 @keyframes project-tree-spin {

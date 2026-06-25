@@ -20,6 +20,7 @@ import {
   FileText,
   FileJson,
   GitBranch,
+  GraduationCap,
   History,
   MessageSquare,
   Settings as SettingsIcon,
@@ -139,6 +140,7 @@ import {
   type Theme,
 } from "./lib/theme";
 import { applyTextSize, DEFAULT_TEXT_SIZE, getTextSize, nextTextSize } from "./lib/textSize";
+import { applySkillModeProfileTransition } from "./lib/skillModeProfiles";
 import { useViewportHeightVar, useWindowStatePersistence } from "./lib/windowState";
 import { availableWorkspacePanelWidth, resolveLiveWorkspacePanelWidth, resolveWorkspacePanelWidth, workspacePanelAriaMinWidth } from "./lib/workspaceLayout";
 import { createRafResizeUpdater } from "./lib/resizeDrag";
@@ -925,6 +927,8 @@ export default function App() {
   const sidebarSearchFocusSignal = useOverlayStore((s) => s.sidebarSearchFocusSignal);
   const setSidebarSearchFocusSignal = useOverlayStore((s) => s.setSidebarSearchFocusSignal);
   const [sidebarTogglePressed, setSidebarTogglePressed] = useState(false);
+  const [studentModeEnabled, setStudentModeEnabled] = useState(false);
+  const [studentModeSyncing, setStudentModeSyncing] = useState(false);
   const [workspaceTogglePressed, setWorkspaceTogglePressed] = useState(false);
   const [clearContextPending, setClearContextPending] = useState(false);
   const topicRenameSkipCommitRef = useRef(false);
@@ -1211,6 +1215,16 @@ export default function App() {
   const collaborationMode = displayedComposerProfileCollaborationMode(composerProfile);
   const toolApprovalMode = composerProfile.toolApprovalMode;
   const tokenMode: TokenMode = composerProfile.tokenMode;
+  useEffect(() => {
+    if (!studentModeEnabled) return;
+    if (rightDockMode === "context") setRightDockMode("files");
+  }, [rightDockMode, setRightDockMode, studentModeEnabled]);
+  useEffect(() => {
+    if (!studentModeEnabled) return;
+    if (!state.effort?.supported) return;
+    const current = (state.effort.current || "").trim();
+    if (current && current !== "auto") void setEffort("auto");
+  }, [setEffort, state.effort, studentModeEnabled]);
   const controllerReady = state.meta?.ready === true && !state.backendActivationPending;
   const patchActiveComposerProfile = useCallback(
     (patch: Partial<Omit<ComposerProfile, "pending">>, pendingFields: ComposerProfileField[]) => {
@@ -1320,6 +1334,34 @@ export default function App() {
     },
     [activeTabId, patchActiveComposerProfile, setControllerToolApprovalMode, toolApprovalMode],
   );
+  useEffect(() => {
+    if (!studentModeEnabled) return;
+    if (toolApprovalMode === "auto") applyToolApprovalMode("ask");
+  }, [applyToolApprovalMode, studentModeEnabled, toolApprovalMode]);
+  const toggleStudentMode = useCallback(async () => {
+    if (studentModeSyncing) return;
+    const nextEnabled = !studentModeEnabled;
+    setStudentModeEnabled(nextEnabled);
+    setStudentModeSyncing(true);
+    try {
+      if (controllerReady) {
+        await app.SetStudentMode(nextEnabled);
+      }
+      await applySkillModeProfileTransition(studentModeEnabled ? "student" : "normal", nextEnabled ? "student" : "normal");
+    } catch (error) {
+      console.warn("[student-mode] failed to sync skills", error);
+      setStudentModeEnabled(studentModeEnabled);
+      showToast(t("topicBar.studentModeSyncFailed"), "warn");
+    } finally {
+      setStudentModeSyncing(false);
+    }
+  }, [controllerReady, showToast, studentModeEnabled, studentModeSyncing, t]);
+  useEffect(() => {
+    if (!activeTabId || !controllerReady) return;
+    void app.SetStudentMode(studentModeEnabled).catch((error) => {
+      console.warn("[student-mode] failed to apply prompt mode to active tab", error);
+    });
+  }, [activeTabId, controllerReady, studentModeEnabled]);
   const toggleYoloApprovalMode = useCallback(() => {
     if (!activeTabId) return;
     const next = toggleYoloToolApprovalMode(
@@ -2584,6 +2626,7 @@ export default function App() {
         "app",
         `app--${desktopPlatform}`,
         browserPreviewChrome ? "app--browser-preview" : "",
+        studentModeEnabled ? "app--student-mode" : "",
         sidebarWorkbench ? "app--workbench" : "",
         sidebarCreation ? "app--creation" : "",
       ].filter(Boolean).join(" ")}
@@ -2713,14 +2756,16 @@ export default function App() {
                   <MessageSquare size={14} aria-hidden="true" />
                   <span>{t("creation.sidebar.messageChannels")}</span>
                 </button>
-                <button
-                  className="sidebar-feature-zone__item"
-                  type="button"
-                  onClick={() => setHeartbeatOpen(true)}
-                >
-                  <AlarmClock size={14} aria-hidden="true" />
-                  <span>{t("sidebar.automation")}</span>
-                </button>
+                {!studentModeEnabled && (
+                  <button
+                    className="sidebar-feature-zone__item"
+                    type="button"
+                    onClick={() => setHeartbeatOpen(true)}
+                  >
+                    <AlarmClock size={14} aria-hidden="true" />
+                    <span>{t("sidebar.automation")}</span>
+                  </button>
+                )}
               </div>
             </section>
           )}
@@ -2775,16 +2820,18 @@ export default function App() {
                     <span className="sr-only">{t("sidebar.trash")}</span>
                   </button>
                 </Tooltip>
-                <Tooltip label={t("heartbeat.scheduler")} fill side="top">
-                  <button
-                    className="sidebar__utility-button"
-                    type="button"
-                    onClick={() => setHeartbeatOpen(true)}
-                  >
-                    <AlarmClock size={16} aria-hidden="true" />
-                    <span className="sr-only">{t("sidebar.automation")}</span>
-                  </button>
-                </Tooltip>
+                {!studentModeEnabled && (
+                  <Tooltip label={t("heartbeat.scheduler")} fill side="top">
+                    <button
+                      className="sidebar__utility-button"
+                      type="button"
+                      onClick={() => setHeartbeatOpen(true)}
+                    >
+                      <AlarmClock size={16} aria-hidden="true" />
+                      <span className="sr-only">{t("sidebar.automation")}</span>
+                    </button>
+                  </Tooltip>
+                )}
                 <Tooltip label={t("topbar.settings")} fill side="top">
                   <button
                     className="sidebar__utility-button"
@@ -2837,7 +2884,7 @@ export default function App() {
                   <span>{t("sidebar.trash")}</span>
                 </button>
               </Tooltip>
-              {!sidebarCreation && (
+              {!sidebarCreation && !studentModeEnabled && (
                 <Tooltip label={t("heartbeat.scheduler")} fill side="right" disabled={sidebarNavTooltipDisabled}>
                   <button
                     className="sidebar__navitem"
@@ -2976,6 +3023,23 @@ export default function App() {
             </div>
             <div className="topicbar__spacer" />
             <div className="topicbar__actions">
+              <Tooltip label={studentModeEnabled ? t("topicBar.studentModeOn") : t("topicBar.studentMode")}>
+                <button
+                  className={[
+                    "topicbar__action-btn",
+                    "topicbar__action-btn--icon",
+                    "topicbar__action-btn--student",
+                    studentModeEnabled ? "topicbar__action-btn--student-active" : "",
+                  ].filter(Boolean).join(" ")}
+                  type="button"
+                  aria-label={studentModeEnabled ? t("topicBar.studentModeOn") : t("topicBar.studentMode")}
+                  aria-pressed={studentModeEnabled}
+                  disabled={studentModeSyncing}
+                  onClick={() => void toggleStudentMode()}
+                >
+                  <GraduationCap size={15} />
+                </button>
+              </Tooltip>
               {workbenchChromeHidden && (
                 <Tooltip label={workspacePanelRenderable ? t("rightDock.collapse") : t("rightDock.expand")}>
                   <button
@@ -3041,43 +3105,49 @@ export default function App() {
               </div>
               </>
               )}
-              <Tooltip label={t("workspace.changedTab")}>
-                <button
-                  className="topicbar__action-btn topicbar__action-btn--label"
-                  type="button"
-                  aria-label={t("workspace.changedTab")}
-                  aria-pressed={workspacePanelRenderable && rightDockMode === "changed"}
-                  onClick={() => openRightDockMode("changed")}
-                >
-                  <GitBranch size={14} />
-                  <span>{t("workspace.changedTab")}</span>
-                </button>
-              </Tooltip>
-              <Tooltip label={t("shortcuts.cheatsheetTitle")}>
-                <button
-                  className="topicbar__action-btn topicbar__action-btn--icon topicbar__action-btn--utility"
-                  type="button"
-                  aria-label={t("shortcuts.cheatsheetTitle")}
-                  onClick={() => {
-                    closeTransientOverlays();
-                    setSettingsFocus(null);
-                    setSettingsTarget("shortcuts");
-                  }}
-                >
-                  <CircleHelp size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label={t("topicBar.command")}>
-                <button
-                  className="topicbar__action-btn topicbar__action-btn--label topicbar__action-btn--accent"
-                  type="button"
-                  aria-label={t("topicBar.command")}
-                  onClick={() => void openPalette()}
-                >
-                  <Command size={14} />
-                  <span>{t("topicBar.command")}</span>
-                </button>
-              </Tooltip>
+              {!studentModeEnabled && (
+                <Tooltip label={t("workspace.changedTab")}>
+                  <button
+                    className="topicbar__action-btn topicbar__action-btn--label"
+                    type="button"
+                    aria-label={t("workspace.changedTab")}
+                    aria-pressed={workspacePanelRenderable && rightDockMode === "changed"}
+                    onClick={() => openRightDockMode("changed")}
+                  >
+                    <GitBranch size={14} />
+                    <span>{t("workspace.changedTab")}</span>
+                  </button>
+                </Tooltip>
+              )}
+              {!studentModeEnabled && (
+                <Tooltip label={t("shortcuts.cheatsheetTitle")}>
+                  <button
+                    className="topicbar__action-btn topicbar__action-btn--icon topicbar__action-btn--utility"
+                    type="button"
+                    aria-label={t("shortcuts.cheatsheetTitle")}
+                    onClick={() => {
+                      closeTransientOverlays();
+                      setSettingsFocus(null);
+                      setSettingsTarget("shortcuts");
+                    }}
+                  >
+                    <CircleHelp size={14} />
+                  </button>
+                </Tooltip>
+              )}
+              {!studentModeEnabled && (
+                <Tooltip label={t("topicBar.command")}>
+                  <button
+                    className="topicbar__action-btn topicbar__action-btn--label topicbar__action-btn--accent"
+                    type="button"
+                    aria-label={t("topicBar.command")}
+                    onClick={() => void openPalette()}
+                  >
+                    <Command size={14} />
+                    <span>{t("topicBar.command")}</span>
+                  </button>
+                </Tooltip>
+              )}
               {sidebarCreation && (
                 <Tooltip label={workspacePanelRenderable ? t("rightDock.collapse") : t("rightDock.expand")}>
                   <button
@@ -3199,6 +3269,7 @@ export default function App() {
               collaborationMode={collaborationMode}
               toolApprovalMode={toolApprovalMode}
               tokenMode={tokenMode}
+              studentModeEnabled={studentModeEnabled}
               goal={goal}
               cwd={state.meta?.cwd}
               modelLabel={state.meta?.label ?? t("status.connecting")}
@@ -3227,28 +3298,30 @@ export default function App() {
               transientDismissSignal={transientOverlayDismissSignal}
               sessionKey={composerSessionKey}
             />
-            <StatusBar
-              context={state.context}
-              usage={state.usage}
-              balance={state.balance}
-              jobs={state.jobs}
-              running={state.running || rewindCommitting}
-              collaborationMode={collaborationMode}
-              toolApprovalMode={toolApprovalMode}
-              sessionTurns={sessionTurns}
-              sessionTokens={state.sessionTokens}
-              turnTokens={state.turnTotalTokens}
-              turnCost={state.turnCost}
-              cost={state.sessionCost}
-              currency={state.sessionCurrency}
-              modelLabel={state.meta?.label}
-              labelStyle={statusBarStyle}
-              items={statusBarItems}
-              workspacePath={state.meta?.workspacePath || state.meta?.workspaceRoot || state.meta?.cwd}
-              workspaceName={state.meta?.workspaceName}
-              gitBranch={state.meta?.gitBranch}
-              hydrationLabel={hydrateStatusLabel}
-            />
+            {!studentModeEnabled && (
+              <StatusBar
+                context={state.context}
+                usage={state.usage}
+                balance={state.balance}
+                jobs={state.jobs}
+                running={state.running || rewindCommitting}
+                collaborationMode={collaborationMode}
+                toolApprovalMode={toolApprovalMode}
+                sessionTurns={sessionTurns}
+                sessionTokens={state.sessionTokens}
+                turnTokens={state.turnTotalTokens}
+                turnCost={state.turnCost}
+                cost={state.sessionCost}
+                currency={state.sessionCurrency}
+                modelLabel={state.meta?.label}
+                labelStyle={statusBarStyle}
+                items={statusBarItems}
+                workspacePath={state.meta?.workspacePath || state.meta?.workspaceRoot || state.meta?.cwd}
+                workspaceName={state.meta?.workspaceName}
+                gitBranch={state.meta?.gitBranch}
+                hydrationLabel={hydrateStatusLabel}
+              />
+            )}
           </footer>
           )}
           </>
@@ -3280,7 +3353,7 @@ export default function App() {
           >
             <div className="workbench-dock__tools">
               <div className="workbench-dock__tabs" role="tablist" aria-label={t("rightDock.views")}>
-                {SHOW_CONTEXT_DOCK && (
+                {SHOW_CONTEXT_DOCK && !studentModeEnabled && (
                   <button
                     type="button"
                     role="tab"
@@ -3315,7 +3388,7 @@ export default function App() {
               </div>
             </div>
             <div className="workbench-dock__body">
-              {rightDockMode === "context" ? (
+              {!studentModeEnabled && rightDockMode === "context" ? (
                 <ContextPanel
                   tabId={activeTabId}
                   context={state.context}
@@ -3376,9 +3449,10 @@ export default function App() {
       {settingsTarget !== null && (
         <Suspense fallback={null}>
           <SettingsPanel
-            initialTab={settingsTarget}
+            initialTab={studentModeEnabled && settingsTarget !== "skills" ? "models" : settingsTarget}
             initialFocus={settingsFocus ?? undefined}
             agentRunning={state.running}
+            studentModeEnabled={studentModeEnabled}
             onClose={() => {
               setSettingsFocus(null);
               setSettingsTarget(null);

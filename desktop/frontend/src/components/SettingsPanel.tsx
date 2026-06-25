@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode } from "react";
+import { createContext, lazy, memo, Suspense, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode } from "react";
 import { Check, CheckCircle2, ChevronDown, ChevronUp, Clipboard, GripVertical, KeyRound, Loader2, Play, QrCode, RefreshCw, Send } from "lucide-react";
 import { asArray } from "../lib/array";
 import { useDeferredClose } from "../lib/useMountTransition";
@@ -55,7 +55,9 @@ import { ModalCloseButton } from "./ModalCloseButton";
 import { ShortcutComboDisplay } from "./ShortcutComboDisplay";
 
 const SETTINGS_TABS: SettingsTab[] = ["general", "models", "bots", "mcp", "skills", "memory", "hooks", "shortcuts", "permissions", "sandbox", "network", "appearance", "updates"];
+const STUDENT_SETTINGS_TABS: SettingsTab[] = ["models", "skills"];
 export type SettingsInitialFocus = { target: "bot-allowlist"; connectionId?: string };
+const StudentSettingsModeContext = createContext(false);
 
 const MCPServersSettingsPage = lazy(() => import("./CapabilitiesPanel").then((module) => ({ default: module.MCPServersSettingsPage })));
 const SkillsSettingsPage = lazy(() => import("./CapabilitiesPanel").then((module) => ({ default: module.SkillsSettingsPage })));
@@ -71,14 +73,20 @@ export function SettingsPanel({
   initialTab,
   initialFocus,
   agentRunning = false,
+  studentModeEnabled = false,
 }: {
   onClose: () => void;
   onChanged: (settings?: SettingsView | null) => void;
   initialTab?: SettingsTab;
   initialFocus?: SettingsInitialFocus;
   agentRunning?: boolean;
+  studentModeEnabled?: boolean;
 }) {
   const t = useT();
+  const resolveTab = useCallback((nextTab?: SettingsTab) => {
+    if (studentModeEnabled) return nextTab === "skills" ? "skills" : "models";
+    return nextTab === "providers" ? "models" : nextTab ?? "general";
+  }, [studentModeEnabled]);
   const [s, setS] = useState<SettingsView | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -90,7 +98,7 @@ export function SettingsPanel({
   const [monoFontFamily, setMonoFontFamilyState] = useState<MonoFontFamily>(getMonoFontFamily());
   const [customFontName, setCustomFontNameState] = useState<string>(getCustomFontName());
   const [customMonoFontName, setCustomMonoFontNameState] = useState<string>(getCustomMonoFontName());
-  const [tab, setTab] = useState<SettingsTab>(initialTab === "providers" ? "models" : initialTab ?? "general");
+  const [tab, setTab] = useState<SettingsTab>(() => resolveTab(initialTab));
   // Play the modal exit animation, then let the parent unmount us.
   const { status, requestClose } = useDeferredClose(onClose, 240);
 
@@ -101,8 +109,8 @@ export function SettingsPanel({
   }, []);
   useEffect(() => {
     void reload();
-    if (initialTab) setTab(initialTab === "providers" ? "models" : initialTab);
-  }, [initialTab, reload]);
+    setTab(resolveTab(initialTab));
+  }, [initialTab, reload, resolveTab]);
   useEffect(() => {
     if (!s) return;
     const nextTheme = normalizeThemePreference(s.desktopTheme);
@@ -150,6 +158,7 @@ export function SettingsPanel({
     return () => document.removeEventListener("keydown", onKey);
   }, [requestClose]);
 
+  const visibleTabs = studentModeEnabled ? STUDENT_SETTINGS_TABS : SETTINGS_TABS;
   // The settings-reliant pages (general, models, network, permissions,
   // sandbox, appearance, updates) need SettingsView loaded. MCP, Skills, and Memory
   // load their own data and render regardless.
@@ -157,23 +166,24 @@ export function SettingsPanel({
   const lazySettingsPageFallback = <div className="empty">{t("settings.loading")}</div>;
 
   return (
-    <div className="management-modal-backdrop settings-modal-backdrop" data-state={status} onClick={(e) => { if (e.target === e.currentTarget) requestClose(); }}>
-      <div className="management-modal settings-modal" data-state={status}>
+    <StudentSettingsModeContext.Provider value={studentModeEnabled}>
+      <div className="management-modal-backdrop settings-modal-backdrop" data-state={status} onClick={(e) => { if (e.target === e.currentTarget) requestClose(); }}>
+      <div className={`management-modal settings-modal${studentModeEnabled ? " settings-modal--student" : ""}`} data-state={status}>
         <header className="management-modal__head settings-modal__head">
-          <div className="management-modal__title settings-modal__title">{t("settings.title")}</div>
+          <div className="management-modal__title settings-modal__title">{studentModeEnabled ? t("settings.studentModeTitle") : t("settings.title")}</div>
           <ModalCloseButton label={t("common.close")} onClick={requestClose} />
         </header>
 
         <div className="settings-center">
           <nav className="settings-center__nav" aria-label={t("settings.title")}>
-            {SETTINGS_TABS.map((id) => (
+            {visibleTabs.map((id) => (
               <button
                 key={id}
                 className={`settings-center__navitem${tab === id ? " settings-center__navitem--active" : ""}`}
                 onClick={() => setTab(id)}
               >
                 <span>{settingsTabLabel(id, t)}</span>
-                {s && <small>{settingsTabMeta(id, s, t)}</small>}
+                {!studentModeEnabled && s && <small>{settingsTabMeta(id, s, t)}</small>}
               </button>
             ))}
           </nav>
@@ -188,7 +198,7 @@ export function SettingsPanel({
                 {tab === "models" && s && <SettingsPageShell key={tab} s={s} tab={tab} busy={busy} apply={apply}><ModelsSection s={s} busy={busy} apply={apply} backgroundApply={backgroundApply} /></SettingsPageShell>}
                 {tab === "bots" && s && <SettingsPageShell key={tab} s={s} tab={tab} busy={busy} apply={apply}><BotsSection s={s} busy={busy} apply={apply} initialFocus={initialFocus} /></SettingsPageShell>}
                 {tab === "mcp" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><Suspense fallback={lazySettingsPageFallback}><MCPServersSettingsPage /></Suspense></SettingsPageShell>}
-                {tab === "skills" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><Suspense fallback={lazySettingsPageFallback}><SkillsSettingsPage /></Suspense></SettingsPageShell>}
+                {tab === "skills" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><Suspense fallback={lazySettingsPageFallback}><SkillsSettingsPage studentModeEnabled={studentModeEnabled} /></Suspense></SettingsPageShell>}
                 {tab === "memory" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><Suspense fallback={lazySettingsPageFallback}><MemorySettingsPage /></Suspense></SettingsPageShell>}
                 {tab === "hooks" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><HooksSection onChanged={onChanged} /></SettingsPageShell>}
                 {tab === "shortcuts" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><ShortcutsSection /></SettingsPageShell>}
@@ -258,18 +268,20 @@ export function SettingsPanel({
         </div>
       </div>
     </div>
+    </StudentSettingsModeContext.Provider>
   );
 }
 
 function SettingsPageShell({ s: _s, tab, children }: { s: SettingsView | null; tab: SettingsTab; busy: boolean; apply: (fn: () => Promise<unknown>) => Promise<void>; children: ReactNode }) {
   const t = useT();
+  const studentModeEnabled = useContext(StudentSettingsModeContext);
   const descKey = `settings.pageDesc.${tab}` as keyof typeof import("../locales/en").en;
   const desc = t(descKey as any);
   return (
     <div className={`settings-page settings-page--${settingsPageKind(tab)} settings-page--${tab}`}>
       <div className="settings-page__header">
-        <h2 className="settings-page__title">{settingsTabPageTitle(tab, t)}</h2>
-        {typeof desc === "string" && desc !== `settings.pageDesc.${tab}` && <p className="settings-page__desc">{desc}</p>}
+        <h2 className="settings-page__title">{settingsTabPageTitle(tab, t, studentModeEnabled)}</h2>
+        {!studentModeEnabled && typeof desc === "string" && desc !== `settings.pageDesc.${tab}` && <p className="settings-page__desc">{desc}</p>}
       </div>
       {children}
     </div>
@@ -299,6 +311,7 @@ function SettingsSection({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const studentModeEnabled = useContext(StudentSettingsModeContext);
   const hasHead = Boolean(title || description || actions);
   return (
     <section className="settings-section">
@@ -306,7 +319,7 @@ function SettingsSection({
         <div className="settings-section__head">
           <div>
             {title && <div className="settings-section__title">{title}</div>}
-            {description && (
+            {!studentModeEnabled && description && (
               <div className="settings-section__desc">
                 <SettingsHint hint={description} />
               </div>
@@ -333,11 +346,12 @@ function SettingsField({
   className?: string;
   stacked?: boolean;
 }) {
+  const studentModeEnabled = useContext(StudentSettingsModeContext);
   return (
     <div className={`settings-field${stacked ? " settings-field--stacked" : ""}${className ? ` ${className}` : ""}`}>
       <div className="settings-field__copy">
         <div className="settings-field__label">{label}</div>
-        {hint && (
+        {!studentModeEnabled && hint && (
           <div className="settings-field__hint">
             <SettingsHint hint={hint} />
           </div>
@@ -360,7 +374,14 @@ function SettingsHint({ hint }: { hint: ReactNode }) {
   return hint;
 }
 
-function settingsTabPageTitle(id: SettingsTab, t: ReturnType<typeof useT>): string {
+function settingsTabPageTitle(id: SettingsTab, t: ReturnType<typeof useT>, studentModeEnabled: boolean): string {
+  if (studentModeEnabled) {
+    switch (id) {
+      case "models": return t("settings.studentPage.models");
+      case "skills": return t("settings.studentPage.skills");
+      default: return settingsTabLabel(id, t);
+    }
+  }
   switch (id) {
     case "mcp": return t("settings.tab.mcp");
     case "skills": return t("settings.tab.skills");
@@ -2975,6 +2996,7 @@ function botDraftWithDerivedGatewayState(draft: BotSettingsView): BotSettingsVie
 
 function ModelsSection({ s, busy, apply, backgroundApply }: ModelsSectionProps) {
   const t = useT();
+  const studentModeEnabled = useContext(StudentSettingsModeContext);
   const [subtab, setSubtab] = useState<"usage" | "access">("usage");
   const autoRefreshKeyRef = useRef("");
   const refs = useMemo(() => allRefs(s), [s.providers]);
@@ -3037,7 +3059,7 @@ function ModelsSection({ s, busy, apply, backgroundApply }: ModelsSectionProps) 
           aria-selected={subtab === "usage"}
           onClick={() => setSubtab("usage")}
         >
-          {t("settings.modelTab.usage")}
+          {studentModeEnabled ? t("settings.studentModelTab.usage") : t("settings.modelTab.usage")}
         </button>
         <button
           type="button"
@@ -3045,14 +3067,14 @@ function ModelsSection({ s, busy, apply, backgroundApply }: ModelsSectionProps) 
           aria-selected={subtab === "access"}
           onClick={() => setSubtab("access")}
         >
-          {t("settings.modelTab.access")}
+          {studentModeEnabled ? t("settings.studentModelTab.access") : t("settings.modelTab.access")}
         </button>
       </div>
 
       {subtab === "usage" ? (
         <>
-          <SettingsSection title={t("settings.modelUsage")}>
-            <SettingsField label={t("settings.defaultModel")}>
+          <SettingsSection title={studentModeEnabled ? t("settings.studentSection.currentModel") : t("settings.modelUsage")}>
+            <SettingsField label={studentModeEnabled ? t("settings.studentField.currentModel") : t("settings.defaultModel")}>
               <ModelPicker
                 s={s}
                 refs={refs}
@@ -3062,93 +3084,99 @@ function ModelsSection({ s, busy, apply, backgroundApply }: ModelsSectionProps) 
               />
             </SettingsField>
 
-            <SettingsField label={t("settings.plannerModel")}>
-              <ModelPicker
-                s={s}
-                refs={refs}
-                value={plannerSelectRef}
-                disabled={busy}
-                includeSameDefault
-                onPick={(ref) => void apply(() => app.SetPlannerModel(ref))}
-              />
-            </SettingsField>
+            {!studentModeEnabled && (
+              <>
+                <SettingsField label={t("settings.plannerModel")}>
+                  <ModelPicker
+                    s={s}
+                    refs={refs}
+                    value={plannerSelectRef}
+                    disabled={busy}
+                    includeSameDefault
+                    onPick={(ref) => void apply(() => app.SetPlannerModel(ref))}
+                  />
+                </SettingsField>
 
-            <SettingsField label={t("settings.subagentModel")}>
-              <ModelPicker
-                s={s}
-                refs={refs}
-                value={subagentRef}
-                disabled={busy}
-                emptyOptionLabel={t("settings.subagentModelDefault")}
-                emptyOptionHint={t("common.auto")}
-                onPick={(ref) => void apply(() => app.SetSubagentModel(ref))}
-              />
-            </SettingsField>
+                <SettingsField label={t("settings.subagentModel")}>
+                  <ModelPicker
+                    s={s}
+                    refs={refs}
+                    value={subagentRef}
+                    disabled={busy}
+                    emptyOptionLabel={t("settings.subagentModelDefault")}
+                    emptyOptionHint={t("common.auto")}
+                    onPick={(ref) => void apply(() => app.SetSubagentModel(ref))}
+                  />
+                </SettingsField>
 
-            <SettingsField label={t("settings.subagentEffort")} hint={t("settings.subagentHint")}>
-              <select
-                className="mem-select set-grow"
-                value={s.subagentEffort || ""}
-                disabled={busy}
-                onChange={(e) => void apply(() => app.SetSubagentEffort(e.target.value))}
-              >
-                <option value="">{t("settings.subagentEffortDefault")}</option>
-                {EFFORT_PRESETS.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </select>
-            </SettingsField>
+                <SettingsField label={t("settings.subagentEffort")} hint={t("settings.subagentHint")}>
+                  <select
+                    className="mem-select set-grow"
+                    value={s.subagentEffort || ""}
+                    disabled={busy}
+                    onChange={(e) => void apply(() => app.SetSubagentEffort(e.target.value))}
+                  >
+                    <option value="">{t("settings.subagentEffortDefault")}</option>
+                    {EFFORT_PRESETS.map((level) => (
+                      <option key={level} value={level}>
+                        {level}
+                      </option>
+                    ))}
+                  </select>
+                </SettingsField>
+              </>
+            )}
 
             {modelIssue && <div className="provider-fetch-banner provider-fetch-banner--warn">{modelIssue}</div>}
           </SettingsSection>
-          <SettingsSection title={t("settings.agentRuntime")} description={t("settings.agentRuntimeHint")}>
-            <SettingsField label={t("settings.executorMaxSteps")} hint={t("settings.executorMaxStepsHint")}>
-              <StepLimitControl
-                value={agent.maxSteps}
-                presets={[10, 25, 50, 0]}
-                busy={busy}
-                onChange={(next) => void apply(() => setAgentSteps(next, agent.plannerMaxSteps))}
-              />
-            </SettingsField>
-            <SettingsField label={t("settings.plannerMaxSteps")} hint={plannerSelectRef ? t("settings.plannerMaxStepsHint") : t("settings.plannerMaxStepsDisabledHint")}>
-              <StepLimitControl
-                value={agent.plannerMaxSteps}
-                presets={[6, 12, 25, 0]}
-                busy={busy}
-                onChange={(next) => void apply(() => setAgentSteps(agent.maxSteps, next))}
-              />
-            </SettingsField>
-            <SettingsField label={t("settings.coldResumePrune")} hint={t("settings.coldResumePruneHint")}>
-              <div className="set-seg">
-                {([true, false] as const).map((on) => (
-                  <button
-                    key={on ? "on" : "off"}
-                    className={`set-seg__btn${agent.coldResumePrune === on ? " set-seg__btn--on" : ""}`}
-                    disabled={busy}
-                    onClick={() => void apply(() => app.SetColdResumePrune(on))}
-                  >
-                    {on ? t("settings.coldResumePrune.on") : t("settings.coldResumePrune.off")}
-                  </button>
-                ))}
-              </div>
-            </SettingsField>
-            <SettingsField label={t("settings.reasoningLanguage")} hint={t("settings.reasoningLanguageHint")}>
-              <div className="set-seg">
-                {(["auto", "zh", "en"] as const).map((lang) => (
-                  <button
-                    key={lang}
-                    className={`set-seg__btn${agent.reasoningLanguage === lang ? " set-seg__btn--on" : ""}`}
-                    disabled={busy}
-                    onClick={() => void apply(() => app.SetReasoningLanguage(lang))}
-                  >
-                    {t(`settings.reasoningLanguage.${lang}`)}
-                  </button>
-                ))}
-              </div>
-            </SettingsField>
-          </SettingsSection>
+          {!studentModeEnabled && (
+            <SettingsSection title={t("settings.agentRuntime")} description={t("settings.agentRuntimeHint")}>
+              <SettingsField label={t("settings.executorMaxSteps")} hint={t("settings.executorMaxStepsHint")}>
+                <StepLimitControl
+                  value={agent.maxSteps}
+                  presets={[10, 25, 50, 0]}
+                  busy={busy}
+                  onChange={(next) => void apply(() => setAgentSteps(next, agent.plannerMaxSteps))}
+                />
+              </SettingsField>
+              <SettingsField label={t("settings.plannerMaxSteps")} hint={plannerSelectRef ? t("settings.plannerMaxStepsHint") : t("settings.plannerMaxStepsDisabledHint")}>
+                <StepLimitControl
+                  value={agent.plannerMaxSteps}
+                  presets={[6, 12, 25, 0]}
+                  busy={busy}
+                  onChange={(next) => void apply(() => setAgentSteps(agent.maxSteps, next))}
+                />
+              </SettingsField>
+              <SettingsField label={t("settings.coldResumePrune")} hint={t("settings.coldResumePruneHint")}>
+                <div className="set-seg">
+                  {([true, false] as const).map((on) => (
+                    <button
+                      key={on ? "on" : "off"}
+                      className={`set-seg__btn${agent.coldResumePrune === on ? " set-seg__btn--on" : ""}`}
+                      disabled={busy}
+                      onClick={() => void apply(() => app.SetColdResumePrune(on))}
+                    >
+                      {on ? t("settings.coldResumePrune.on") : t("settings.coldResumePrune.off")}
+                    </button>
+                  ))}
+                </div>
+              </SettingsField>
+              <SettingsField label={t("settings.reasoningLanguage")} hint={t("settings.reasoningLanguageHint")}>
+                <div className="set-seg">
+                  {(["auto", "zh", "en"] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      className={`set-seg__btn${agent.reasoningLanguage === lang ? " set-seg__btn--on" : ""}`}
+                      disabled={busy}
+                      onClick={() => void apply(() => app.SetReasoningLanguage(lang))}
+                    >
+                      {t(`settings.reasoningLanguage.${lang}`)}
+                    </button>
+                  ))}
+                </div>
+              </SettingsField>
+            </SettingsSection>
+          )}
         </>
       ) : (
         <ProvidersSection s={s} busy={busy} apply={apply} />

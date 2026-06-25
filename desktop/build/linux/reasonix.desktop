@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Reasonix
-Comment=Reasonix desktop — a Wails shell around the Go kernel
-Exec=reasonix-desktop
-Icon=reasonix-desktop
+Name=RealmLab
+Comment=RealmLab desktop — a Wails shell around the Go kernel
+Exec=realmlab-desktop
+Icon=realmlab-desktop
 Categories=Development;Utility;
 Terminal=false
-StartupWMClass=reasonix-desktop
+StartupWMClass=realmlab-desktop

@@ -1073,6 +1073,7 @@ func (a *App) clearActiveSessionRuntime(tab *WorkspaceTab, oldCtrl control.Sessi
 		SessionDir:               tabSessionDir(tab),
 		EffortOverride:           cloneStringPtr(tab.effort),
 		TokenMode:                currentTabTokenMode(tab),
+		StudentMode:              tab.studentMode,
 		SharedHost:               sharedHost,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 	})
@@ -5289,6 +5290,7 @@ func (a *App) SetModelForTab(tabID, name string) error {
 		SessionDir:               tabSessionDir(tab),
 		EffortOverride:           cloneStringPtr(effortOverride),
 		TokenMode:                currentTabTokenMode(tab),
+		StudentMode:              tab.studentMode,
 		SharedHost:               sharedHost,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 	})
@@ -5388,6 +5390,7 @@ func (a *App) SetEffortForTab(tabID, level string) error {
 		SessionDir:               tabSessionDir(tab),
 		EffortOverride:           &effort,
 		TokenMode:                currentTabTokenMode(tab),
+		StudentMode:              tab.studentMode,
 		SharedHost:               sharedHost,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 	})
@@ -5463,6 +5466,7 @@ func (a *App) SetTokenModeForTab(tabID, mode string) error {
 		SessionDir:               tabSessionDir(tab),
 		EffortOverride:           cloneStringPtr(tab.effort),
 		TokenMode:                mode,
+		StudentMode:              tab.studentMode,
 		SharedHost:               sharedHost,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 	})
