@@ -904,7 +904,8 @@ export const zhTW: Record<DictKey, string> = {
   "settings.bashOffShort": "不受限執行",
   "settings.language": "語言",
   "settings.langAuto": "自動（跟隨系統）",
-  "settings.config": "全域設定檔（相容舊版路徑）：{path}",
+  "settings.config": "全域設定檔：RealmLab 本地設定已載入",
+  "settings.configHint": "內部會保留舊版相容儲存路徑；正常使用無需處理。",
 
   // 待辦欄
   "todo.title": "待辦",
@@ -1008,6 +1009,8 @@ export const zhTW: Record<DictKey, string> = {
   "updater.title": "軟體更新",
   "updater.currentVersion": "當前版本：{v}",
   "updater.localVersion": "本地開發版（{v}）",
+  "updater.disabled": "目前建置未啟用遠端更新檢查。",
+  "updater.localDisabled": "本地開發版不連接遠端更新來源；正式發布後會使用 RealmLab 獨立更新渠道。",
   "updater.channelLabel": "更新渠道：{channel}",
   "updater.checkButton": "檢查更新",
   "updater.checking": "正在檢查更新…",

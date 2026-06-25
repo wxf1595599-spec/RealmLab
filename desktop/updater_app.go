@@ -25,6 +25,9 @@ func (a *App) Version() string { return version }
 // build is available for this platform. Safe to call on startup: a network error
 // surfaces in UpdateInfo.Err rather than failing, so the UI can stay quiet.
 func (a *App) CheckUpdate() (*UpdateInfo, error) {
+	if reason := updateDisabledReason(); reason != "" {
+		return disabledUpdateInfo(reason), nil
+	}
 	c, err := httpClient()
 	if err != nil {
 		return &UpdateInfo{
@@ -58,6 +61,9 @@ func (a *App) CheckUpdate() (*UpdateInfo, error) {
 // OpenDownloadPage opens the releases page in the browser — the macOS manual-update
 // path and a fallback link elsewhere.
 func (a *App) OpenDownloadPage() {
+	if updateDisabledReason() != "" {
+		return
+	}
 	page := downloadPage()
 	if c, err := httpClient(); err == nil {
 		ctx, cancel := context.WithTimeout(a.reqCtx(), httpTimeout)

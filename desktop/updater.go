@@ -75,6 +75,7 @@ type UpdateInfo struct {
 	CanSelfUpdate bool   `json:"canSelfUpdate"` // win/linux true; macOS true only for signed/notarized builds
 	ManualOnly    bool   `json:"manualOnly,omitempty"`
 	ManualReason  string `json:"manualReason,omitempty"`
+	DisabledReason string `json:"disabledReason,omitempty"` // local builds do not poll remote feeds
 	Downloaded    bool   `json:"downloaded"`
 	DownloadURL   string `json:"downloadUrl"`   // human-facing releases page (macOS path / fallback link)
 	AssetSize     int64  `json:"assetSize"`     // running platform's artifact size, for the progress bar
@@ -126,6 +127,23 @@ func manualUpdateReason() string {
 		return "macOS automatic updates require a Developer ID signed and notarized build"
 	}
 	return ""
+}
+
+func updateDisabledReason() string {
+	if channel == "local" {
+		return "local"
+	}
+	return ""
+}
+
+func disabledUpdateInfo(reason string) *UpdateInfo {
+	return &UpdateInfo{
+		Current:        version,
+		Channel:        channel,
+		CanSelfUpdate:  false,
+		ManualOnly:     true,
+		DisabledReason: reason,
+	}
 }
 
 // normalizeVersion canonicalizes a version to semver "vX.Y.Z". It reports ok=false

@@ -8,6 +8,7 @@ import type { UpdateInfo } from "./types";
 export type UpdateStatus =
   | { kind: "idle" }
   | { kind: "checking" }
+  | { kind: "disabled"; reason: string }
   | { kind: "upToDate"; current: string }
   | { kind: "available"; info: UpdateInfo }
   | { kind: "downloading"; received: number; total: number; info: UpdateInfo }
@@ -70,6 +71,10 @@ export function useUpdater(): Updater {
       }
       if (info.err) {
         setStatus({ kind: "error", message: info.err });
+        return;
+      }
+      if (info.disabledReason) {
+        setStatus({ kind: "disabled", reason: info.disabledReason });
         return;
       }
       if (!info.available) {

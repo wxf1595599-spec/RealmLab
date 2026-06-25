@@ -81,6 +81,31 @@ func TestEvaluate(t *testing.T) {
 	}
 }
 
+func TestLocalChannelDisablesRemoteUpdates(t *testing.T) {
+	origChannel := channel
+	origVersion := version
+	t.Cleanup(func() {
+		channel = origChannel
+		version = origVersion
+	})
+
+	channel = "local"
+	version = "dev-local"
+
+	if got := updateDisabledReason(); got != "local" {
+		t.Fatalf("updateDisabledReason() = %q, want local", got)
+	}
+	info := disabledUpdateInfo(updateDisabledReason())
+	if info.DisabledReason != "local" || info.Current != "dev-local" || info.Channel != "local" || info.CanSelfUpdate {
+		t.Fatalf("disabledUpdateInfo() = %+v, want local disabled update info", info)
+	}
+
+	channel = "stable"
+	if got := updateDisabledReason(); got != "" {
+		t.Fatalf("stable updateDisabledReason() = %q, want empty", got)
+	}
+}
+
 func TestChannelSelectsDistinctPointers(t *testing.T) {
 	orig := channel
 	t.Cleanup(func() { channel = orig })

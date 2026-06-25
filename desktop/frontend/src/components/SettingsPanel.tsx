@@ -67,6 +67,10 @@ function formatUpdateVersion(version: string, t: Translator): string {
   return t("updater.localVersion", { v: trimmed });
 }
 
+function formatUpdateDisabledReason(reason: string, t: Translator): string {
+  return reason === "local" ? t("updater.localDisabled") : t("updater.disabled");
+}
+
 const MCPServersSettingsPage = lazy(() => import("./CapabilitiesPanel").then((module) => ({ default: module.MCPServersSettingsPage })));
 const SkillsSettingsPage = lazy(() => import("./CapabilitiesPanel").then((module) => ({ default: module.SkillsSettingsPage })));
 const MemorySettingsPage = lazy(() => import("./MemoryPanel").then((module) => ({ default: module.MemorySettingsPage })));
@@ -5471,6 +5475,9 @@ function UpdatesSection({
       {status.kind === "available" && (
         <div className="mem-hint">{t("updater.channelLabel", { channel: status.info.channel || "stable" })}</div>
       )}
+      {status.kind === "disabled" && (
+        <div className="mem-hint">{formatUpdateDisabledReason(status.reason, t)}</div>
+      )}
       {status.kind === "upToDate" && <div className="mem-hint">{t("updater.upToDate")}</div>}
       {status.kind === "available" && (
         <>
@@ -5503,8 +5510,8 @@ function UpdatesSection({
       {status.kind === "done" && <div className="mem-hint">{t("updater.done")}</div>}
       {status.kind === "error" && <div className="banner banner--error">{t("updater.failed", { msg: status.message })}</div>}
       {configPath && (
-        <Tooltip label={configPath} fill block className="mem-hint settings-config-path">
-          {t("settings.config", { path: configPath })}
+        <Tooltip label={t("settings.configHint")} fill block className="mem-hint settings-config-path">
+          {t("settings.config")}
         </Tooltip>
       )}
     </SettingsSection>
