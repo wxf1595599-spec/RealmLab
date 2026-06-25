@@ -1850,8 +1850,9 @@ func (a *App) SetExpandThinking(on bool) error {
 }
 
 // MigrateDesktopPreferences imports old browser-local desktop preferences into
-// the user config once. Existing [desktop] values win so stale localStorage never
-// overwrites an explicit config edit.
+// the user config once. Existing [desktop] values win. RealmLab deliberately
+// does not import legacy browser-local theme values: stale WebKit storage should
+// never pull the product default away from light Slate.
 func (a *App) MigrateDesktopPreferences(language, theme, style string) error {
 	return a.applyConfigOnly(func(c *config.Config) error {
 		if strings.TrimSpace(c.Desktop.Language) == "" {
@@ -1860,7 +1861,9 @@ func (a *App) MigrateDesktopPreferences(language, theme, style string) error {
 			}
 		}
 		if strings.TrimSpace(c.Desktop.Theme) == "" && strings.TrimSpace(c.Desktop.ThemeStyle) == "" {
-			if err := c.SetDesktopAppearance(theme, style); err != nil {
+			_ = theme
+			_ = style
+			if err := c.SetDesktopAppearance(config.RealmLabDefaultDesktopTheme, config.RealmLabDefaultDesktopThemeStyle); err != nil {
 				return err
 			}
 		}

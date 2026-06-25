@@ -2641,8 +2641,10 @@ function makeMockApp(): AppBindings {
         async MigrateDesktopPreferences(language: string, theme: string, style: string) {
           if (!settings.desktopLanguage) settings.desktopLanguage = language === "en" || language === "zh" || language === "zh-TW" ? language : "";
           if (!settings.desktopTheme && !settings.desktopThemeStyle) {
-            settings.desktopTheme = theme === "auto" || theme === "light" ? theme : "dark";
-            settings.desktopThemeStyle = style;
+            void theme;
+            void style;
+            settings.desktopTheme = REALMLAB_DEFAULT_THEME;
+            settings.desktopThemeStyle = REALMLAB_DEFAULT_THEME_STYLE;
           }
         },
     async SetAgentParams(temperature: number, maxSteps: number, plannerMaxSteps: number, systemPrompt: string) {

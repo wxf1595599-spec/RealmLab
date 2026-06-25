@@ -149,6 +149,23 @@ func TestDesktopPreferencesAreSeparateFromCLI(t *testing.T) {
 	}
 }
 
+func TestSetDesktopAppearanceEmptyUsesRealmLabDefaultPalette(t *testing.T) {
+	c := Default()
+	c.Desktop.Theme = ""
+	c.Desktop.ThemeStyle = ""
+
+	if err := c.SetDesktopAppearance("", ""); err != nil {
+		t.Fatalf("SetDesktopAppearance: %v", err)
+	}
+
+	if got := c.DesktopTheme(); got != RealmLabDefaultDesktopTheme {
+		t.Fatalf("desktop theme = %q, want %q", got, RealmLabDefaultDesktopTheme)
+	}
+	if got := c.DesktopThemeStyle(); got != RealmLabDefaultDesktopThemeStyle {
+		t.Fatalf("desktop theme style = %q, want %q", got, RealmLabDefaultDesktopThemeStyle)
+	}
+}
+
 func TestDesktopLayoutStyleNormalizes(t *testing.T) {
 	if got := Default().DesktopLayoutStyle(); got != "workbench" {
 		t.Fatalf("default desktop layout style = %q, want workbench", got)

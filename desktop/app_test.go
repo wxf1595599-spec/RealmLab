@@ -1838,6 +1838,22 @@ func TestMigrateDesktopPreferencesDoesNotOverwriteExistingConfig(t *testing.T) {
 	}
 }
 
+func TestMigrateDesktopPreferencesKeepsRealmLabDefaultPaletteForNewConfig(t *testing.T) {
+	isolateDesktopUserDirs(t)
+
+	if err := NewApp().MigrateDesktopPreferences("zh", "auto", "graphite"); err != nil {
+		t.Fatalf("migrate desktop preferences: %v", err)
+	}
+
+	got := config.LoadForEdit(config.UserConfigPath())
+	if got.DesktopLanguage() != "zh" {
+		t.Fatalf("desktop language = %q, want zh", got.DesktopLanguage())
+	}
+	if got.DesktopTheme() != config.RealmLabDefaultDesktopTheme || got.DesktopThemeStyle() != config.RealmLabDefaultDesktopThemeStyle {
+		t.Fatalf("desktop palette after legacy migration = theme:%q style:%q, want %s/%s", got.DesktopTheme(), got.DesktopThemeStyle(), config.RealmLabDefaultDesktopTheme, config.RealmLabDefaultDesktopThemeStyle)
+	}
+}
+
 func TestSetEffortRebuildsController(t *testing.T) {
 	isolateDesktopUserDirs(t)
 
