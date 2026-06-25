@@ -3,7 +3,7 @@ import { Check, CheckCircle2, ChevronDown, ChevronUp, Clipboard, GripVertical, K
 import { asArray } from "../lib/array";
 import { useDeferredClose } from "../lib/useMountTransition";
 import { app } from "../lib/bridge";
-import { normalizeLangPref, useI18n, useT, type DictKey, type LangPref } from "../lib/i18n";
+import { normalizeLangPref, useI18n, useT, type DictKey, type LangPref, type Translator } from "../lib/i18n";
 import { apiKeyEnvFromProviderName, inferredVisionModels, mergedFetchedProviderModels, providerApiKeyEnvForSave, providerDefaultModel, providerIsConfigured, providerModelCandidates, providerRequiresKey } from "../lib/providerModels";
 import { useUpdater } from "../lib/useUpdater";
 import {
@@ -58,6 +58,14 @@ const SETTINGS_TABS: SettingsTab[] = ["general", "models", "bots", "mcp", "skill
 const STUDENT_SETTINGS_TABS: SettingsTab[] = ["models", "skills"];
 export type SettingsInitialFocus = { target: "bot-allowlist"; connectionId?: string };
 const StudentSettingsModeContext = createContext(false);
+const RELEASE_VERSION_PATTERN = /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
+
+function formatUpdateVersion(version: string, t: Translator): string {
+  const trimmed = version.trim();
+  if (!trimmed) return "...";
+  if (RELEASE_VERSION_PATTERN.test(trimmed)) return trimmed;
+  return t("updater.localVersion", { v: trimmed });
+}
 
 const MCPServersSettingsPage = lazy(() => import("./CapabilitiesPanel").then((module) => ({ default: module.MCPServersSettingsPage })));
 const SkillsSettingsPage = lazy(() => import("./CapabilitiesPanel").then((module) => ({ default: module.SkillsSettingsPage })));
@@ -5415,6 +5423,7 @@ function UpdatesSection({
   useEffect(() => {
     app.Version().then(setVersion).catch(() => {});
   }, []);
+  const displayVersion = formatUpdateVersion(version, t);
 
   const updaterBusy =
     status.kind === "checking" || status.kind === "downloading" || status.kind === "verifying" || status.kind === "installing";
@@ -5454,7 +5463,7 @@ function UpdatesSection({
           onChange={(enabled) => void applySettings(() => app.SetDesktopMetrics(enabled))}
         />
       </SettingsField>
-      <SettingsField label={t("updater.currentVersion", { v: version || "…" })}>
+      <SettingsField label={t("updater.currentVersion", { v: displayVersion })}>
         <button className="btn btn--small" disabled={updaterBusy} onClick={() => void check()}>
           {status.kind === "checking" ? t("updater.checking") : t("updater.checkButton")}
         </button>

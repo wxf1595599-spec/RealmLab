@@ -904,7 +904,7 @@ export const zhTW: Record<DictKey, string> = {
   "settings.bashOffShort": "不受限執行",
   "settings.language": "語言",
   "settings.langAuto": "自動（跟隨系統）",
-  "settings.config": "設定檔：{path}",
+  "settings.config": "全域設定檔（相容舊版路徑）：{path}",
 
   // 待辦欄
   "todo.title": "待辦",
@@ -1007,6 +1007,7 @@ export const zhTW: Record<DictKey, string> = {
   // 軟體更新
   "updater.title": "軟體更新",
   "updater.currentVersion": "當前版本：{v}",
+  "updater.localVersion": "本地開發版（{v}）",
   "updater.channelLabel": "更新渠道：{channel}",
   "updater.checkButton": "檢查更新",
   "updater.checking": "正在檢查更新…",
