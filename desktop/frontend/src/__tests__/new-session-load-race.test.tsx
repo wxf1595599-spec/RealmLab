@@ -111,6 +111,14 @@ const resetState = reducer(
 eq(resetState.items.length, 0, "reset clears real transcript items");
 eq(resetState.hydratePlaceholderItems?.length, 1, "reset preserves hydration placeholder separately");
 
+const emptyHistoryState = reducer(resetState, { type: "history", messages: [] });
+eq(emptyHistoryState.items.length, 0, "empty history keeps the real transcript empty");
+eq(emptyHistoryState.hydrateHistoryLoaded, true, "empty history marks transcript hydration loaded");
+eq(emptyHistoryState.hydratePlaceholderItems?.length ?? 0, 0, "empty history clears hydration placeholder items");
+
+const hydrateDoneState = reducer(emptyHistoryState, { type: "hydrate_done" });
+eq(Boolean(hydrateDoneState.hydrateHistoryLoaded), false, "hydrate_done clears the history-loaded marker");
+
 const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
   pretendToBeVisual: true,
   url: "http://localhost/",
