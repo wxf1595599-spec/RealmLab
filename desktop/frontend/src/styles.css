@@ -3044,8 +3044,8 @@ a[href] {
   display: block;
 }
 .startup-splash__name {
-  font-size: 27px;
-  font-weight: 650;
+  font-size: 26px;
+  font-weight: 800;
   letter-spacing: 0;
   line-height: 1.1;
   color: var(--fg);
@@ -3445,8 +3445,8 @@ a[href] {
 }
 
 .welcome {
-  --welcome-brand-width: 240px;
-  --welcome-brand-height: 56px;
+  --welcome-brand-width: 312px;
+  --welcome-brand-height: 62px;
   --welcome-brand-gap: 26px;
   width: min(100%, 600px);
   max-height: none;
@@ -3550,8 +3550,8 @@ a[href] {
 
 @container (max-height: 560px) {
   .welcome--brand {
-    --welcome-brand-width: 224px;
-    --welcome-brand-height: 52px;
+    --welcome-brand-width: 286px;
+    --welcome-brand-height: 58px;
     --welcome-brand-gap: 22px;
     transform: translateY(-16px);
   }
@@ -19264,9 +19264,9 @@ a[href] {
 .sidebar__brand-logo {
   flex: 0 0 auto;
   display: block;
-  width: 136px;
-  height: 32px;
-  margin-left: -21px;
+  width: 168px;
+  height: 34px;
+  margin-left: -10px;
   object-fit: contain;
   object-position: left center;
 }
@@ -22247,9 +22247,9 @@ a[href] {
 }
 
 .sidebar--workbench .sidebar__brand-logo--workbench {
-  width: 118px;
-  height: 24px;
-  margin-left: -14px;
+  width: 150px;
+  height: 28px;
+  margin-left: -8px;
 }
 
 .sidebar--workbench .sidebar__brand svg {
@@ -24210,9 +24210,9 @@ a[href] {
 
 .app--creation .sidebar__brand-logo,
 :root[data-theme-style] .app--creation .sidebar__brand-logo {
-  width: 118px;
-  height: 28px;
-  margin-left: -15px;
+  width: 150px;
+  height: 30px;
+  margin-left: -8px;
 }
 
 .app--creation .sidebar__new,
