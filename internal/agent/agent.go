@@ -1359,6 +1359,10 @@ func (a *Agent) stream(ctx context.Context, turn int) (string, string, string, [
 			return text.String(), stored, signature, calls, usage, false, partialToolStarted, ctx.Err()
 		case c, ok := <-ch:
 			if !ok {
+				if err := ctx.Err(); err != nil {
+					stored, _ := finishReasoning()
+					return text.String(), stored, signature, calls, usage, false, partialToolStarted, err
+				}
 				stored, display := finishReasoning()
 				if text.Len() > 0 || display != "" {
 					a.sink.Emit(event.Event{

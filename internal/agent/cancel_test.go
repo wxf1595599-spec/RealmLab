@@ -119,6 +119,29 @@ func (stuckStreamProvider) Stream(context.Context, provider.Request) (<-chan pro
 	return make(chan provider.Chunk), nil
 }
 
+type closedStreamProvider struct{}
+
+func (closedStreamProvider) Name() string { return "closed-stream" }
+
+func (closedStreamProvider) Stream(context.Context, provider.Request) (<-chan provider.Chunk, error) {
+	ch := make(chan provider.Chunk)
+	close(ch)
+	return ch, nil
+}
+
+func TestCanceledContextClosedProviderStreamReturnsCancel(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		a := New(closedStreamProvider{}, tool.NewRegistry(), NewSession(""), Options{}, &recordSink{})
+		err := a.Run(ctx, "already cancelled")
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Run error on iteration %d = %v, want context cancellation", i, err)
+		}
+	}
+}
+
 func TestCancelDuringStuckProviderStreamReturnsPromptly(t *testing.T) {
 	a := New(stuckStreamProvider{}, tool.NewRegistry(), NewSession(""), Options{}, &recordSink{})
 
