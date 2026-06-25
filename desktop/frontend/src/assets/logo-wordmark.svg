@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 140" width="780" height="140" role="img" aria-label="MicroRealm Lab">
-  <text x="20" y="105" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="100" letter-spacing="-5" text-rendering="geometricPrecision">
-    <tspan font-weight="600" fill="#0A0A0A">Micro</tspan><tspan font-weight="200" fill="#3F3F46">Realm</tspan>
+  <text x="20" y="105" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="100" letter-spacing="-5" textLength="520" lengthAdjust="spacingAndGlyphs" text-rendering="geometricPrecision">
+    <tspan font-weight="600" fill="#0A0A0A">Micro</tspan><tspan font-weight="380" fill="#3F3F46">Realm</tspan>
   </text>
-  <path fill="#2563EB" d="M574 52 C577.5 67 585 74.5 600 78 C585 81.5 577.5 89 574 104 C570.5 89 563 81.5 548 78 C563 74.5 570.5 67 574 52Z"/>
-  <text x="610" y="103" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="88" font-weight="650" letter-spacing="-3.5" fill="#0A0A0A" text-rendering="geometricPrecision">Lab</text>
+  <path fill="#2F6FE0" d="M570 49 C571.8 60.6 577.56 67 588 69 C577.56 71 571.8 77.4 570 89 C568.2 77.4 562.44 71 552 69 C562.44 67 568.2 60.6 570 49Z"/>
+  <text x="600" y="105" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="80" font-weight="500" letter-spacing="-3" fill="#3F3F46" text-rendering="geometricPrecision">Lab</text>
 </svg>
