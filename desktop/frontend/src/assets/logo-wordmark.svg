@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 140" width="850" height="140" role="img" aria-label="MicroRealm Lab">
   <text x="20" y="105" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="100">
-    <tspan font-weight="600" letter-spacing="-5" fill="#0A0A0A">Micro</tspan><tspan font-weight="200" letter-spacing="-5" fill="#3F3F46">Realm</tspan><tspan dx="16" font-size="54" font-weight="650" letter-spacing="0" fill="#2563EB">✦</tspan><tspan dx="16" font-weight="600" letter-spacing="-5" fill="#0A0A0A">Lab</tspan>
+    <tspan font-weight="600" letter-spacing="-5" fill="#0A0A0A">Micro</tspan><tspan font-weight="200" letter-spacing="-5" fill="#3F3F46">Realm</tspan><tspan dx="12" dy="-7" font-size="72" font-weight="650" letter-spacing="0" fill="#2563EB">✦</tspan><tspan dx="12" dy="7" font-weight="600" letter-spacing="-5" fill="#0A0A0A">Lab</tspan>
   </text>
 </svg>
