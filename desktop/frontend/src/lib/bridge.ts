@@ -103,6 +103,24 @@ interface DesktopWindowState {
   maximised: boolean;
 }
 
+interface VoiceInputRequest {
+  dataUrl: string;
+  mimeType: string;
+  locale: string;
+}
+
+interface VoiceInputResult {
+  text: string;
+  provider?: string;
+  model?: string;
+}
+
+interface VoiceInputCapabilities {
+  transcriptionConfigured: boolean;
+  provider?: string;
+  model?: string;
+}
+
 // AppBindings is the hand-written contract between the React app and the Go
 // kernel. It uses local types (types.ts) so components don't import generated
 // model classes. _CheckGeneratedBindings catches drift: when a Go method is
@@ -301,6 +319,8 @@ export interface AppBindings {
   OpenDownloadPage(): Promise<void>;
   NeedsOnboarding(): Promise<boolean>;
   ConnectKey(apiKey: string): Promise<string>;
+  VoiceInputCapabilities(): Promise<VoiceInputCapabilities>;
+  TranscribeVoiceInput(input: VoiceInputRequest): Promise<VoiceInputResult>;
   // Crash overlay "Send report" (desktop/crash_app.go): scrubs user paths, attaches
   // version/os/arch, POSTs to the collection endpoint. Only ever sent on user click.
   ReportCrash(kind: string, detail: string): Promise<void>;
@@ -2730,6 +2750,13 @@ function makeMockApp(): AppBindings {
       });
       await delay(300);
       return "";
+    },
+    async TranscribeVoiceInput() {
+      await delay(180);
+      return { text: "Voice input transcript from the desktop mock." };
+    },
+    async VoiceInputCapabilities() {
+      return { transcriptionConfigured: true, provider: "mock-asr", model: "mock-whisper" };
     },
     async ReportCrash() {
       await delay(300);

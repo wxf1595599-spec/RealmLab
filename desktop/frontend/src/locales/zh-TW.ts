@@ -286,6 +286,8 @@ export const zhTW: Record<DictKey, string> = {
   "composer.voiceUnsupported": "目前環境暫時不支援語音輸入",
   "composer.voicePermissionDenied": "沒有拿到麥克風權限",
   "composer.voiceStartFailed": "語音輸入沒有成功啟動",
+  "composer.voiceTranscriptionFailed": "語音轉寫失敗",
+  "composer.voiceProviderMissing": "尚未配置語音轉寫模型",
   "composer.stop": "停止（Esc）",
   "composer.stopShort": "停止",
   "composer.pastedLabel": "[已貼上文字 #{id} · {lines} 行]",

@@ -37,6 +37,23 @@ class TestResizeObserver {
   disconnect() {}
 }
 
+type FakeMediaStreamTrack = { stop(): void; stopped: boolean };
+
+function fakeMediaStream() {
+  const track: FakeMediaStreamTrack = {
+    stopped: false,
+    stop() {
+      this.stopped = true;
+    },
+  };
+  return {
+    track,
+    stream: {
+      getTracks: () => [track],
+    },
+  };
+}
+
 type FakeSpeechResultEvent = Event & {
   resultIndex: number;
   results: ArrayLike<{ isFinal?: boolean; 0?: { transcript?: string } }>;
@@ -90,8 +107,44 @@ class FakeSpeechRecognition extends EventTarget {
   }
 }
 
-function installDom(options: { speechRecognition?: boolean } = {}) {
-  const { speechRecognition = true } = options;
+type FakeMediaRecorderEvent = Event & { data?: Blob };
+
+class FakeMediaRecorder {
+  static instances: FakeMediaRecorder[] = [];
+  static supportedTypes: string[] = ["audio/webm;codecs=opus", "audio/webm"];
+
+  mimeType: string;
+  state: "inactive" | "recording" = "inactive";
+  ondataavailable: ((event: FakeMediaRecorderEvent) => void) | null = null;
+  onstop: ((event: Event) => void) | null = null;
+  onerror: ((event: Event & { error?: unknown }) => void) | null = null;
+
+  constructor(_stream: MediaStream, options: { mimeType?: string } = {}) {
+    this.mimeType = options.mimeType || "audio/webm";
+    FakeMediaRecorder.instances.push(this);
+  }
+
+  static isTypeSupported(type: string): boolean {
+    return FakeMediaRecorder.supportedTypes.includes(type);
+  }
+
+  start() {
+    this.state = "recording";
+  }
+
+  stop() {
+    if (this.state === "inactive") return;
+    this.state = "inactive";
+    this.ondataavailable?.({
+      ...new Event("dataavailable"),
+      data: new Blob(["voice-bytes"], { type: this.mimeType }),
+    } as FakeMediaRecorderEvent);
+    this.onstop?.(new Event("stop"));
+  }
+}
+
+function installDom(options: { speechRecognition?: boolean; mediaRecorder?: boolean; getUserMedia?: () => Promise<unknown>; transcribeVoiceInput?: (input: unknown) => Promise<unknown>; voiceInputCapabilities?: () => Promise<unknown> } = {}) {
+  const { speechRecognition = true, mediaRecorder = false, getUserMedia, transcribeVoiceInput, voiceInputCapabilities } = options;
   const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
     pretendToBeVisual: true,
     url: "http://localhost/",
@@ -110,6 +163,8 @@ function installDom(options: { speechRecognition?: boolean } = {}) {
   globalThis.MouseEvent = dom.window.MouseEvent;
   globalThis.PointerEvent = dom.window.MouseEvent as unknown as typeof PointerEvent;
   globalThis.MutationObserver = dom.window.MutationObserver;
+  globalThis.Blob = dom.window.Blob;
+  globalThis.FileReader = dom.window.FileReader;
   globalThis.localStorage = dom.window.localStorage;
   globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
@@ -137,10 +192,31 @@ function installDom(options: { speechRecognition?: boolean } = {}) {
           Commands: async () => [],
           Models: async () => [],
           ModelsForTab: async () => [],
+          VoiceInputCapabilities: voiceInputCapabilities ?? (async () => ({ transcriptionConfigured: true, provider: "test-asr", model: "test-whisper" })),
+          TranscribeVoiceInput: transcribeVoiceInput ?? (async () => ({ text: "" })),
         },
       },
     },
   });
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: {
+      getUserMedia: getUserMedia ?? (async () => fakeMediaStream().stream),
+    },
+  });
+  if (mediaRecorder) {
+    Object.defineProperty(window, "MediaRecorder", {
+      configurable: true,
+      value: FakeMediaRecorder,
+    });
+    globalThis.MediaRecorder = FakeMediaRecorder as unknown as typeof MediaRecorder;
+  } else {
+    Object.defineProperty(window, "MediaRecorder", {
+      configurable: true,
+      value: undefined,
+    });
+    globalThis.MediaRecorder = undefined as unknown as typeof MediaRecorder;
+  }
   if (speechRecognition) {
     Object.defineProperty(window, "webkitSpeechRecognition", {
       configurable: true,
@@ -157,6 +233,7 @@ function installDom(options: { speechRecognition?: boolean } = {}) {
     });
   }
   FakeSpeechRecognition.instances = [];
+  FakeMediaRecorder.instances = [];
   return dom;
 }
 
@@ -237,6 +314,47 @@ console.log("\ncomposer voice input");
 }
 
 {
+  const transcribeCalls: unknown[] = [];
+  const dom = installDom({
+    speechRecognition: false,
+    mediaRecorder: true,
+    transcribeVoiceInput: async (input) => {
+      transcribeCalls.push(input);
+      return { text: "后端转写文本" };
+    },
+  });
+  const { root } = await renderComposer();
+
+  const voiceButton = document.querySelector(".composer__actions .composer__btn--voice") as HTMLButtonElement | null;
+  ok(Boolean(voiceButton), "desktop composer shows native recording voice input without Web Speech");
+
+  await act(async () => {
+    voiceButton?.click();
+    await flushTimers();
+  });
+
+  ok(Boolean(FakeMediaRecorder.instances[0]?.state === "recording"), "native voice input starts a media recorder");
+  eq(voiceButton?.getAttribute("aria-pressed"), "true", "native voice input shows recording state");
+
+  await act(async () => {
+    voiceButton?.click();
+    await flushTimers();
+    await flushTimers();
+  });
+
+  const textarea = document.querySelector("textarea") as HTMLTextAreaElement | null;
+  eq(transcribeCalls.length, 1, "native voice input sends recorded audio to the desktop backend");
+  ok(String((transcribeCalls[0] as { dataUrl?: string })?.dataUrl ?? "").startsWith("data:audio/"), "native voice input sends an audio data URL");
+  eq(textarea?.value, "后端转写文本", "backend transcript is inserted into the composer");
+  eq(voiceButton?.getAttribute("aria-pressed"), "false", "native voice input exits recording state after transcription");
+
+  await act(async () => {
+    root.unmount();
+  });
+  dom.window.close();
+}
+
+{
   const dom = installDom({ speechRecognition: false });
   const { root } = await renderComposer();
 
@@ -250,6 +368,62 @@ console.log("\ncomposer voice input");
   });
 
   ok(document.body.textContent?.includes("Voice input is not available here") ?? false, "unsupported desktop voice input explains the limitation");
+
+  await act(async () => {
+    root.unmount();
+  });
+  dom.window.close();
+}
+
+{
+  const dom = installDom({
+    speechRecognition: false,
+    mediaRecorder: true,
+    voiceInputCapabilities: async () => ({ transcriptionConfigured: false }),
+  });
+  const { root } = await renderComposer();
+
+  await act(async () => {
+    await flushTimers();
+  });
+
+  const voiceButton = document.querySelector(".composer__actions .composer__btn--voice") as HTMLButtonElement | null;
+  await act(async () => {
+    voiceButton?.click();
+    await flushTimers();
+  });
+
+  eq(FakeMediaRecorder.instances.length, 0, "missing voice provider does not start native recording");
+  ok(document.body.textContent?.includes("Voice transcription provider is not configured") ?? false, "missing voice provider is explained");
+
+  await act(async () => {
+    root.unmount();
+  });
+  dom.window.close();
+}
+
+{
+  const dom = installDom({
+    speechRecognition: false,
+    mediaRecorder: true,
+    getUserMedia: async () => {
+      const err = new Error("denied");
+      err.name = "NotAllowedError";
+      throw err;
+    },
+  });
+  const { root } = await renderComposer();
+
+  const voiceButton = document.querySelector(".composer__actions .composer__btn--voice") as HTMLButtonElement | null;
+  await act(async () => {
+    voiceButton?.click();
+    await flushTimers();
+  });
+
+  const textarea = document.querySelector("textarea") as HTMLTextAreaElement | null;
+  eq(voiceButton?.getAttribute("aria-pressed"), "false", "native permission denial exits voice listening mode");
+  ok(Boolean(textarea && !textarea.disabled), "native permission denial keeps the composer editable");
+  ok(document.body.textContent?.includes("Microphone permission was denied") ?? false, "native permission denial is explained");
 
   await act(async () => {
     root.unmount();

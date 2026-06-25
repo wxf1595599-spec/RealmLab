@@ -410,6 +410,8 @@ export const zh: Record<DictKey, string> = {
   "composer.voiceUnsupported": "当前环境暂时不支持语音输入",
   "composer.voicePermissionDenied": "没有拿到麦克风权限",
   "composer.voiceStartFailed": "语音输入没启动起来",
+  "composer.voiceTranscriptionFailed": "语音转写失败",
+  "composer.voiceProviderMissing": "还没有配置语音转写模型",
   "composer.shellMode": "Shell 模式：给输入前加 !",
   "composer.shellModeOn": "Shell 模式已开：点击移除 !",
   "composer.stop": "停止（Esc）",

@@ -409,6 +409,8 @@ export const en = {
   "composer.voiceUnsupported": "Voice input is not available here",
   "composer.voicePermissionDenied": "Microphone permission was denied",
   "composer.voiceStartFailed": "Voice input could not start",
+  "composer.voiceTranscriptionFailed": "Voice transcription failed",
+  "composer.voiceProviderMissing": "Voice transcription provider is not configured",
   "composer.shellMode": "Shell mode: prefix input with !",
   "composer.shellModeOn": "Shell mode on: click to remove !",
   "composer.stop": "Stop (Esc)",

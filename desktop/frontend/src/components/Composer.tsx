@@ -93,6 +93,8 @@ type SpeechRecognitionLike = EventTarget & {
   abort(): void;
 };
 
+type VoiceInputMode = "speech" | "media";
+
 function speechRecognitionCtor(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
   const speechWindow = window as typeof window & {
@@ -110,6 +112,50 @@ function speechRecognitionLang(locale: string): string {
 
 function desktopRuntimeAvailable(): boolean {
   return typeof window !== "undefined" && Boolean(window.runtime || window.go?.main?.App);
+}
+
+const VOICE_RECORDER_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg;codecs=opus",
+] as const;
+
+function mediaRecorderCtor(): typeof MediaRecorder | null {
+  if (typeof window === "undefined") return null;
+  const mediaWindow = window as typeof window & { MediaRecorder?: typeof MediaRecorder };
+  return mediaWindow.MediaRecorder ?? null;
+}
+
+function voiceRecorderMimeType(Ctor: typeof MediaRecorder): string {
+  for (const type of VOICE_RECORDER_MIME_TYPES) {
+    if (typeof Ctor.isTypeSupported !== "function" || Ctor.isTypeSupported(type)) return type;
+  }
+  return "";
+}
+
+function mediaRecordingSupported(): boolean {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return false;
+  return Boolean(mediaRecorderCtor());
+}
+
+function desktopTranscriptionSupported(): boolean {
+  return typeof window !== "undefined" && typeof window.go?.main?.App?.TranscribeVoiceInput === "function";
+}
+
+function blobToDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("failed to read audio"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function isVoicePermissionError(error: unknown): boolean {
+  const name = error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name ?? "") : "";
+  const message = error && typeof error === "object" && "message" in error ? String((error as { message?: unknown }).message ?? "") : String(error ?? "");
+  return /NotAllowed|Permission|Security/i.test(`${name} ${message}`);
 }
 
 const DEFAULT_COMPOSER_DRAFT_KEY = "__default_composer_draft__";
@@ -515,6 +561,8 @@ export function Composer({
   const [submitting, setSubmitting] = useState(false);
   const [composerPrompt, setComposerPrompt] = useState<string | null>(null);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceBackendReady, setVoiceBackendReady] = useState(false);
+  const [voiceBackendChecked, setVoiceBackendChecked] = useState(false);
   // Prompt history navigation (plain ↑/↓)
   // Use refs for values read inside async closures to avoid stale captures
   // on rapid key presses (the React closure trap).
@@ -547,6 +595,10 @@ export function Composer({
   const attachmentDedupRef = useRef(new DedupIndex());
   const attachmentDedupKeysRef = useRef<Record<string, AttachmentDedupKey>>({});
   const voiceRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceModeRef = useRef<VoiceInputMode | null>(null);
+  const voiceMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceMediaStreamRef = useRef<MediaStream | null>(null);
+  const voiceAudioChunksRef = useRef<Blob[]>([]);
   const voiceInsertRef = useRef({ prefix: "", suffix: "" });
   const voiceFinalTranscriptRef = useRef("");
   const draftKey = sessionKey || tabId || DEFAULT_COMPOSER_DRAFT_KEY;
@@ -628,6 +680,17 @@ export function Composer({
   useEffect(() => () => {
     voiceRecognitionRef.current?.abort();
     voiceRecognitionRef.current = null;
+    const recorder = voiceMediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        /* ignore recorder shutdown failures */
+      }
+    }
+    voiceMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    voiceMediaStreamRef.current = null;
+    voiceMediaRecorderRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -1381,33 +1444,62 @@ export function Composer({
     if (typeof restored === "string") setTextCaretEnd(restored);
   };
 
-  const voiceSupported = useMemo(() => {
-    // Web Speech is the current live transcription path. Desktop builds still
-    // render the entry point below so unsupported WebViews can explain what is
-    // missing instead of making voice input disappear.
-    return Boolean(speechRecognitionCtor());
-  }, []);
+  const voiceMediaSupported = useMemo(() => mediaRecordingSupported(), []);
+  const voiceNativeSupported = voiceMediaSupported && voiceBackendReady;
+  const voiceSpeechSupported = useMemo(() => Boolean(speechRecognitionCtor()), []);
+  const voiceSupported = voiceNativeSupported || voiceSpeechSupported;
   const voiceVisible = voiceSupported || desktopRuntimeAvailable();
 
+  useEffect(() => {
+    if (!desktopRuntimeAvailable() || !desktopTranscriptionSupported()) {
+      setVoiceBackendReady(false);
+      setVoiceBackendChecked(true);
+      return;
+    }
+    let alive = true;
+    setVoiceBackendChecked(false);
+    app.VoiceInputCapabilities()
+      .then((cap) => {
+        if (!alive) return;
+        setVoiceBackendReady(Boolean(cap?.transcriptionConfigured));
+        setVoiceBackendChecked(true);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setVoiceBackendReady(false);
+        setVoiceBackendChecked(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [cwd, ready]);
+
   const stopVoiceInput = useCallback(() => {
+    if (voiceModeRef.current === "media") {
+      const recorder = voiceMediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+      return;
+    }
     voiceRecognitionRef.current?.stop();
+  }, []);
+
+  const stopVoiceMediaStream = useCallback(() => {
+    voiceMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    voiceMediaStreamRef.current = null;
   }, []);
 
   const resetVoiceInputState = useCallback(() => {
     voiceRecognitionRef.current = null;
+    voiceMediaRecorderRef.current = null;
+    voiceAudioChunksRef.current = [];
+    stopVoiceMediaStream();
+    voiceModeRef.current = null;
     setVoiceListening(false);
-  }, []);
+  }, [stopVoiceMediaStream]);
 
-  const toggleVoiceInput = useCallback(() => {
-    if (voiceListening) {
-      stopVoiceInput();
-      return;
-    }
-    const Ctor = speechRecognitionCtor();
-    if (!Ctor) {
-      showToast(t("composer.voiceUnsupported"), "warn");
-      return;
-    }
+  const prepareVoiceInsert = useCallback(() => {
     const currentText = textRef.current;
     const node = taRef.current;
     const start = node?.selectionStart ?? currentText.length;
@@ -1417,6 +1509,106 @@ export function Composer({
       suffix: currentText.slice(end),
     };
     voiceFinalTranscriptRef.current = "";
+  }, []);
+
+  const applyVoiceTranscript = useCallback((transcript: string) => {
+    const combined = transcript.trim();
+    if (!combined) return;
+    const nextText = `${voiceInsertRef.current.prefix}${combined}${voiceInsertRef.current.suffix}`;
+    setText(nextText);
+    requestAnimationFrame(() => {
+      const target = taRef.current;
+      if (!target) return;
+      const caret = voiceInsertRef.current.prefix.length + combined.length;
+      target.focus();
+      target.setSelectionRange(caret, caret);
+    });
+  }, []);
+
+  const finishNativeVoiceInput = useCallback(async () => {
+    const chunks = voiceAudioChunksRef.current;
+    const recorder = voiceMediaRecorderRef.current;
+    const fallbackType = recorder?.mimeType || "audio/webm";
+    try {
+      if (chunks.length === 0) {
+        showToast(t("composer.voiceStartFailed"), "warn");
+        return;
+      }
+      const blob = new Blob(chunks, { type: chunks[0]?.type || fallbackType });
+      const dataUrl = await blobToDataURL(blob);
+      const result = await app.TranscribeVoiceInput({
+        dataUrl,
+        mimeType: blob.type || fallbackType,
+        locale,
+      });
+      applyVoiceTranscript(String(result?.text ?? ""));
+    } catch (error) {
+      console.warn("[composer] failed to transcribe voice input", error);
+      const message = error instanceof Error && error.message ? error.message : t("composer.voiceTranscriptionFailed");
+      showToast(message, "warn");
+    } finally {
+      resetVoiceInputState();
+    }
+  }, [applyVoiceTranscript, locale, resetVoiceInputState, showToast, t]);
+
+  const startNativeVoiceInput = useCallback(async (): Promise<boolean> => {
+    const Ctor = mediaRecorderCtor();
+    if (!Ctor || !navigator.mediaDevices?.getUserMedia || !desktopTranscriptionSupported()) return false;
+    prepareVoiceInsert();
+    voiceModeRef.current = "media";
+    voiceAudioChunksRef.current = [];
+    setVoiceListening(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = voiceRecorderMimeType(Ctor);
+      const recorder = new Ctor(stream, mimeType ? { mimeType } : undefined);
+      voiceMediaStreamRef.current = stream;
+      voiceMediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          voiceAudioChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onerror = () => {
+        showToast(t("composer.voiceStartFailed"), "warn");
+        resetVoiceInputState();
+      };
+      recorder.onstop = () => {
+        void finishNativeVoiceInput();
+      };
+      recorder.start();
+      return true;
+    } catch (error) {
+      if (isVoicePermissionError(error)) {
+        showToast(t("composer.voicePermissionDenied"), "warn");
+      } else {
+        console.warn("[composer] failed to start native voice input", error);
+        showToast(t("composer.voiceStartFailed"), "warn");
+      }
+      resetVoiceInputState();
+      return true;
+    }
+  }, [finishNativeVoiceInput, prepareVoiceInsert, resetVoiceInputState, showToast, t]);
+
+  const toggleVoiceInput = useCallback(() => {
+    if (voiceListening) {
+      stopVoiceInput();
+      return;
+    }
+    if (voiceNativeSupported) {
+      void startNativeVoiceInput();
+      return;
+    }
+    const Ctor = speechRecognitionCtor();
+    if (!Ctor) {
+      if (voiceMediaSupported && voiceBackendChecked && !voiceBackendReady) {
+        showToast(t("composer.voiceProviderMissing"), "warn");
+      } else {
+        showToast(t("composer.voiceUnsupported"), "warn");
+      }
+      return;
+    }
+    prepareVoiceInsert();
 
     const recognition = new Ctor();
     recognition.lang = speechRecognitionLang(locale);
@@ -1466,6 +1658,7 @@ export function Composer({
     };
 
     try {
+      voiceModeRef.current = "speech";
       voiceRecognitionRef.current = recognition;
       setVoiceListening(true);
       recognition.start();
@@ -1475,7 +1668,7 @@ export function Composer({
       setVoiceListening(false);
       showToast(t("composer.voiceStartFailed"), "warn");
     }
-  }, [locale, resetVoiceInputState, showToast, stopVoiceInput, t, voiceListening]);
+  }, [locale, prepareVoiceInsert, resetVoiceInputState, showToast, startNativeVoiceInput, stopVoiceInput, t, voiceBackendChecked, voiceBackendReady, voiceListening, voiceMediaSupported, voiceNativeSupported]);
 
   useEffect(() => {
     if (!running) return;
