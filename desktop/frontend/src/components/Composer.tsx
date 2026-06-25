@@ -108,6 +108,10 @@ function speechRecognitionLang(locale: string): string {
   return "en-US";
 }
 
+function desktopRuntimeAvailable(): boolean {
+  return typeof window !== "undefined" && Boolean(window.runtime || window.go?.main?.App);
+}
+
 const DEFAULT_COMPOSER_DRAFT_KEY = "__default_composer_draft__";
 
 function lineCount(s: string): number {
@@ -1377,7 +1381,11 @@ export function Composer({
     if (typeof restored === "string") setTextCaretEnd(restored);
   };
 
-  const voiceSupported = useMemo(() => Boolean(speechRecognitionCtor()), []);
+  const voiceSupported = useMemo(() => {
+    // Web Speech is unreliable inside the desktop WebView. Keep the experimental
+    // path available for browser previews, but do not surface it in RealmLab.app.
+    return !desktopRuntimeAvailable() && Boolean(speechRecognitionCtor());
+  }, []);
 
   const stopVoiceInput = useCallback(() => {
     voiceRecognitionRef.current?.stop();
@@ -2394,17 +2402,34 @@ export function Composer({
               {composerPrompt}
             </span>
           )}
-          {!running && (
-            <Tooltip label={t("composer.send")}>
-              <button
-                className="composer__btn composer__btn--send"
-                onClick={submit}
-                disabled={voiceListening || submitting || pendingPaste > 0 || ((!text.trim() && attachments.length === 0 && workspaceRefs.length === 0) && !(goalModeOn && !activeGoal)) || disabled || submitDisabled || readOnly}
-              >
-                <ArrowUp size={16} />
-              </button>
-            </Tooltip>
-          )}
+          <div className="composer__actions">
+            {(voiceSupported || voiceListening) && (
+              <Tooltip label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}>
+                <button
+                  type="button"
+                  className={`composer__btn composer__btn--voice${voiceListening ? " composer__btn--voice-active" : ""}`}
+                  onClick={toggleVoiceInput}
+                  disabled={disabled || readOnly || running || !voiceSupported}
+                  aria-label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}
+                  aria-pressed={voiceListening}
+                  title={voiceSupported ? undefined : t("composer.voiceUnsupported")}
+                >
+                  <Mic size={16} />
+                </button>
+              </Tooltip>
+            )}
+            {!running && (
+              <Tooltip label={t("composer.send")}>
+                <button
+                  className="composer__btn composer__btn--send"
+                  onClick={submit}
+                  disabled={voiceListening || submitting || pendingPaste > 0 || ((!text.trim() && attachments.length === 0 && workspaceRefs.length === 0) && !(goalModeOn && !activeGoal)) || disabled || submitDisabled || readOnly}
+                >
+                  <ArrowUp size={16} />
+                </button>
+              </Tooltip>
+            )}
+          </div>
         </div>
         <div className={composerMetaClass}>
           <div className="composer-meta__params">
@@ -2559,21 +2584,6 @@ export function Composer({
                 </Tooltip>
               </div>
             )}
-          </div>
-          <div className="composer-meta__actions">
-            <Tooltip label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}>
-              <button
-                type="button"
-                className={`composer__btn composer__btn--voice${voiceListening ? " composer__btn--voice-active" : ""}`}
-                onClick={toggleVoiceInput}
-                disabled={disabled || readOnly || running || !voiceSupported}
-                aria-label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}
-                aria-pressed={voiceListening}
-                title={voiceSupported ? undefined : t("composer.voiceUnsupported")}
-              >
-                <Mic size={16} />
-              </button>
-            </Tooltip>
           </div>
         </div>
       </div>

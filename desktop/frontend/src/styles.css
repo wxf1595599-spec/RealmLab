@@ -5202,6 +5202,13 @@ a[href] {
   font-weight: 650;
   white-space: nowrap;
 }
+.composer__actions {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
 .composer__btn {
   display: inline-flex;
   align-items: center;
@@ -5283,14 +5290,6 @@ a[href] {
   min-width: 0;
   flex: 1 1 auto;
   margin-left: 0;
-}
-
-.composer-meta__actions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .composer-meta--has-intent-chip .composer-meta__params {
@@ -23979,7 +23978,6 @@ a[href] {
 :root[data-theme-style] .app--creation .composer__btn {
   width: 34px;
   height: 34px;
-  margin-right: 8px;
   border: 1px solid transparent;
   border-radius: 999px;
 }
