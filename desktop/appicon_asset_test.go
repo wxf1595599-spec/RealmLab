@@ -70,42 +70,47 @@ func assertRealmLabLogoIcon(t *testing.T, img image.Image, size int) {
 		{"left", bounds.Min.X, bounds.Min.Y + bounds.Dy()/2},
 	}
 	for _, point := range visibleEdgePoints {
-		if !isDarkVisible(img.At(point.x, point.y)) {
+		if !isPaleRoundedCanvas(img.At(point.x, point.y)) {
 			t.Fatalf("%s edge must keep the RealmLab rounded icon canvas visible, got %s", point.name, hexColor(img.At(point.x, point.y)))
 		}
 	}
 
-	orangePixels := countPixels(img, isRealmLabOrange)
-	if orangePixels < minArtworkPixels(size, 9000) {
-		t.Fatalf("app icon must contain the orange RealmLab cube, found %d matching pixels", orangePixels)
+	bluePixels := countPixels(img, isRealmLabGlassBlue)
+	if bluePixels < minArtworkPixels(size, 9) {
+		t.Fatalf("app icon must contain the blue glass code cube, found %d matching pixels", bluePixels)
 	}
 
-	platformPixels := countPixels(img, isSilverPlatform)
-	if platformPixels < minArtworkPixels(size, 6000) {
-		t.Fatalf("app icon must contain the silver RealmLab platform, found %d matching pixels", platformPixels)
+	canvasPixels := countPixels(img, isPaleRoundedCanvas)
+	if canvasPixels < minArtworkPixels(size, 3) {
+		t.Fatalf("app icon must contain the pale rounded app canvas, found %d matching pixels", canvasPixels)
+	}
+
+	if size >= 48 {
+		codePixels := countPixelsInCoreCodeBand(img, isWhiteCodeMark)
+		if codePixels < minArtworkPixels(size, 2000) {
+			t.Fatalf("app icon must contain the white code mark in the blue cube, found %d matching pixels", codePixels)
+		}
 	}
 }
 
 func isTransparent(colorValue color.Color) bool {
 	_, _, _, a := rgba8(colorValue)
-	return a <= 0x10
+	return a <= 0x30
 }
 
-func isDarkVisible(colorValue color.Color) bool {
+func isPaleRoundedCanvas(colorValue color.Color) bool {
 	r, g, b, a := rgba8(colorValue)
-	return a >= 0xf0 && r <= 120 && g <= 120 && b <= 120
+	return a >= 0xd8 && r >= 230 && g >= 230 && b >= 230
 }
 
-func isRealmLabOrange(colorValue color.Color) bool {
+func isRealmLabGlassBlue(colorValue color.Color) bool {
 	r, g, b, a := rgba8(colorValue)
-	return a >= 0xf0 && r >= 180 && g >= 70 && g <= 190 && b <= 120 && r > g+25
+	return a >= 0xf0 && b >= 165 && g >= 70 && r <= 190 && b >= g+15 && b >= r+45
 }
 
-func isSilverPlatform(colorValue color.Color) bool {
+func isWhiteCodeMark(colorValue color.Color) bool {
 	r, g, b, a := rgba8(colorValue)
-	maxChannel := max3(r, g, b)
-	minChannel := min3(r, g, b)
-	return a >= 0xf0 && r >= 145 && g >= 145 && b >= 135 && maxChannel-minChannel <= 70
+	return a >= 0xf0 && r >= 245 && g >= 245 && b >= 245
 }
 
 func rgba8(colorValue color.Color) (uint8, uint8, uint8, uint8) {
@@ -131,32 +136,30 @@ func countPixels(img image.Image, match func(color.Color) bool) int {
 	return count
 }
 
+func countPixelsInCoreCodeBand(img image.Image, match func(color.Color) bool) int {
+	bounds := img.Bounds()
+	xMin := bounds.Min.X + bounds.Dx()*36/100
+	xMax := bounds.Min.X + bounds.Dx()*64/100
+	yMin := bounds.Min.Y + bounds.Dy()*40/100
+	yMax := bounds.Min.Y + bounds.Dy()*60/100
+
+	count := 0
+	for y := yMin; y <= yMax; y++ {
+		for x := xMin; x <= xMax; x++ {
+			if match(img.At(x, y)) {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 func minArtworkPixels(size int, divisor int) int {
 	pixels := (size * size) / divisor
 	if pixels < 1 {
 		return 1
 	}
 	return pixels
-}
-
-func max3(a, b, c uint8) uint8 {
-	if b > a {
-		a = b
-	}
-	if c > a {
-		a = c
-	}
-	return a
-}
-
-func min3(a, b, c uint8) uint8 {
-	if b < a {
-		a = b
-	}
-	if c < a {
-		a = c
-	}
-	return a
 }
 
 func decodeICOImage(t *testing.T, path string, size int) image.Image {
