@@ -2837,8 +2837,9 @@ export default function App() {
               <div className="sidebar__utility-row" aria-label={t("sidebar.utilityActions")}>
                 <Tooltip label={t("sidebar.allHistory")} fill side="top">
                   <button
-                    className="sidebar__utility-button"
+                    className={`sidebar__utility-button${histView?.kind === "history" ? " sidebar__utility-button--active" : ""}`}
                     type="button"
+                    aria-pressed={histView?.kind === "history"}
                     onClick={() => void openAllHistory()}
                   >
                     <History size={16} aria-hidden="true" />
@@ -2847,8 +2848,9 @@ export default function App() {
                 </Tooltip>
                 <Tooltip label={t("sidebar.trash")} fill side="top">
                   <button
-                    className="sidebar__utility-button"
+                    className={`sidebar__utility-button${histView?.kind === "trash" ? " sidebar__utility-button--active" : ""}`}
                     type="button"
+                    aria-pressed={histView?.kind === "trash"}
                     onClick={() => void openTrash()}
                   >
                     <Trash2 size={16} aria-hidden="true" />
@@ -2858,8 +2860,9 @@ export default function App() {
                 {!studentModeEnabled && (
                   <Tooltip label={t("heartbeat.scheduler")} fill side="top">
                     <button
-                      className="sidebar__utility-button"
+                      className={`sidebar__utility-button${heartbeatOpen ? " sidebar__utility-button--active" : ""}`}
                       type="button"
+                      aria-pressed={heartbeatOpen}
                       onClick={() => setHeartbeatOpen(true)}
                     >
                       <AlarmClock size={16} aria-hidden="true" />
@@ -2869,8 +2872,9 @@ export default function App() {
                 )}
                 <Tooltip label={t("topbar.settings")} fill side="top">
                   <button
-                    className="sidebar__utility-button"
+                    className={`sidebar__utility-button${settingsTarget !== null ? " sidebar__utility-button--active" : ""}`}
                     type="button"
+                    aria-pressed={settingsTarget !== null}
                     onClick={() => {
                       closeTransientOverlays();
                       setSettingsTarget("general");
