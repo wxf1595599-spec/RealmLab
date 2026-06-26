@@ -110,7 +110,7 @@ func isRealmLabGlassBlue(colorValue color.Color) bool {
 
 func isWhiteCodeMark(colorValue color.Color) bool {
 	r, g, b, a := rgba8(colorValue)
-	return a >= 0xf0 && r >= 245 && g >= 245 && b >= 245
+	return a >= 0xf0 && r >= 235 && g >= 235 && b >= 235
 }
 
 func rgba8(colorValue color.Color) (uint8, uint8, uint8, uint8) {
