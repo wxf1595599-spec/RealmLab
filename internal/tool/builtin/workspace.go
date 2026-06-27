@@ -2,7 +2,6 @@ package builtin
 
 import (
 	"path/filepath"
-	"strings"
 	"time"
 
 	"reasonix/internal/netclient"
@@ -54,7 +53,7 @@ func (w Workspace) Tools(enabled ...string) []tool.Tool {
 		"notebook_edit": notebookEdit{workDir: w.Dir, roots: roots},
 		"delete_range":  deleteRange{workDir: w.Dir, roots: roots},
 		"delete_symbol": deleteSymbol{workDir: w.Dir, roots: roots},
-		"code_index":    codeIndex{workDir: w.Dir},
+		"code_index":    codeIndex{workDir: w.Dir, forbidRoots: forbidRoots},
 		"bash":          bash{workDir: w.Dir, sb: w.Bash, timeout: w.BashTimeout},
 		"ls":            listDir{workDir: w.Dir, forbidRoots: forbidRoots},
 		"glob":          globTool{workDir: w.Dir, forbidRoots: forbidRoots},
@@ -131,14 +130,5 @@ func skipWalkDir(root, path, name string) bool {
 // walk because it is within any forbid-read root. forbidRoots are pre-resolved
 // absolute paths; empty means unconfined.
 func skipForbidDir(path string, forbidRoots []string) bool {
-	if len(forbidRoots) == 0 {
-		return false
-	}
-	abs := absClean(path)
-	for _, r := range forbidRoots {
-		if abs == r || (strings.HasPrefix(abs, r) && (len(abs) == len(r) || abs[len(r)] == filepath.Separator)) {
-			return true
-		}
-	}
-	return false
+	return confineRead(forbidRoots, path)
 }

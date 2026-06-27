@@ -110,10 +110,31 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 	ctx, cancel := context.WithTimeout(ctx, to)
 	defer cancel()
 
-	if g.rg != "" {
-		return g.runRipgrep(ctx, p.Pattern, p.Path, to)
+	info, err := os.Stat(p.Path)
+	if err != nil {
+		return "", fmt.Errorf("grep %s: %w", p.Path, err)
 	}
-	re, err := regexp.Compile(p.Pattern)
+	if confineRead(g.forbidRoots, p.Path) {
+		if info.IsDir() {
+			return formatGrep(ctx, nil, false, to), nil
+		}
+		return "", &os.PathError{Op: "stat", Path: p.Path, Err: os.ErrNotExist}
+	}
+
+	if g.rg != "" {
+		out, wrapped, err := g.runRipgrep(ctx, p.Pattern, p.Path, to)
+		if len(g.forbidRoots) == 0 || wrapped {
+			return out, err
+		}
+		// Without an OS sandbox, ripgrep can walk into forbid-read roots. Fall
+		// back to the native scanner, which prunes those roots in-process.
+	}
+
+	return g.runNative(ctx, p.Pattern, p.Path, info, to)
+}
+
+func (g grepTool) runNative(ctx context.Context, pattern, path string, info os.FileInfo, to time.Duration) (string, error) {
+	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return "", fmt.Errorf("invalid pattern: %w", err)
 	}
@@ -127,6 +148,9 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 
 	// searchFile returns io.EOF as a sentinel once the cap is reached.
 	searchFile := func(file string) error {
+		if confineRead(g.forbidRoots, file) {
+			return nil
+		}
 		f, err := os.Open(file)
 		if err != nil {
 			return nil // skip unreadable files
@@ -202,14 +226,9 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return nil
 	}
 
-	info, err := os.Stat(p.Path)
-	if err != nil {
-		return "", fmt.Errorf("grep %s: %w", p.Path, err)
-	}
-
 	if info.IsDir() {
-		ig := newWalkIgnorer(p.Path, g.forbidRoots)
-		_ = filepath.WalkDir(p.Path, func(path string, d os.DirEntry, err error) error {
+		ig := newWalkIgnorer(path, g.forbidRoots)
+		_ = filepath.WalkDir(path, func(path string, d os.DirEntry, err error) error {
 			if ctx.Err() != nil {
 				return ctx.Err() // abort promptly on cancel — a huge tree is interruptible
 			}
@@ -232,10 +251,7 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 			return nil
 		})
 	} else {
-		if confineRead(g.forbidRoots, p.Path) {
-			return "", &os.PathError{Op: "stat", Path: p.Path, Err: os.ErrNotExist}
-		}
-		_ = searchFile(p.Path)
+		_ = searchFile(path)
 	}
 
 	return formatGrep(ctx, out, truncated, to), nil
@@ -246,26 +262,29 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 // capped at grepMaxMatches so a flood of hits can't blow up memory.
 // The ripgrep subprocess is wrapped in the OS sandbox so forbid-read
 // directories are invisible to it.
-func (g grepTool) runRipgrep(ctx context.Context, pattern, path string, to time.Duration) (string, error) {
+func (g grepTool) runRipgrep(ctx context.Context, pattern, path string, to time.Duration) (string, bool, error) {
 	// Build the ripgrep argv and wrap it in the OS sandbox so forbid-read
 	// directories are invisible to the ripgrep subprocess.
-	argv, _ := sandbox.CommandArgs(g.sb, []string{
+	argv, wrapped := sandbox.CommandArgs(g.sb, []string{
 		g.rg,
 		"--no-heading", "--line-number", "--with-filename", "--color", "never",
 		"--regexp", pattern,
 		"--", path,
 	})
+	if len(g.forbidRoots) > 0 && !wrapped {
+		return "", wrapped, nil
+	}
 
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	proc.HideWindow(cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", err
+		return "", wrapped, err
 	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("ripgrep: %w", err)
+		return "", wrapped, fmt.Errorf("ripgrep: %w", err)
 	}
 
 	var out []string
@@ -289,10 +308,10 @@ func (g grepTool) runRipgrep(ctx context.Context, pattern, path string, to time.
 		// ripgrep exits 1 with no output for "no matches"; a real failure (bad
 		// pattern, unreadable path) writes a message to stderr.
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return "", fmt.Errorf("ripgrep: %s", msg)
+			return "", wrapped, fmt.Errorf("ripgrep: %s", msg)
 		}
 	}
-	return formatGrep(ctx, out, truncated, to), nil
+	return formatGrep(ctx, out, truncated, to), wrapped, nil
 }
 
 // SearchSpec configures the grep tool's engine. A non-empty RgPath makes grep

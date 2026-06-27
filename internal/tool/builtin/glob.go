@@ -68,6 +68,7 @@ func (g globTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 	if err != nil {
 		return "", fmt.Errorf("glob %q: %w", p.Pattern, err)
 	}
+	matches = filterForbidMatches(matches, g.forbidRoots)
 	if len(matches) == 0 && !strings.ContainsAny(rawPattern, "/\\") {
 		return g.globRecursive(ctx, filepath.Join(g.workDir, "**", rawPattern))
 	}
@@ -79,6 +80,19 @@ func (g globTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return strings.Join(matches, "\n") + fmt.Sprintf("\n... (truncated at %d results)", globMaxResults), nil
 	}
 	return strings.Join(matches, "\n"), nil
+}
+
+func filterForbidMatches(matches, forbidRoots []string) []string {
+	if len(forbidRoots) == 0 || len(matches) == 0 {
+		return matches
+	}
+	out := matches[:0]
+	for _, match := range matches {
+		if !confineRead(forbidRoots, match) {
+			out = append(out, match)
+		}
+	}
+	return out
 }
 
 // globRecursive handles patterns containing ** by walking the filesystem.
@@ -123,6 +137,9 @@ func (g globTool) globRecursive(ctx context.Context, pattern string) (string, er
 			if skipWalkDir(root, path, d.Name()) || skipForbidDir(path, g.forbidRoots) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if confineRead(g.forbidRoots, path) {
 			return nil
 		}
 		// If there's no suffix, every file matches.

@@ -52,7 +52,7 @@ func ConfineWriters(roots []string) []tool.Tool {
 }
 
 // ConfineReaders returns the read/list/search built-ins (read_file, glob,
-// ls) bound to forbidRoots — directories the agent may not read or list.
+// ls, code_index) bound to forbidRoots — directories the agent may not read or list.
 // grep is handled separately by ConfineSearch so it can carry the
 // sandbox spec for its ripgrep subprocess.
 // An empty forbidRoots slice yields unconfined readers.
@@ -62,6 +62,7 @@ func ConfineReaders(forbidRoots []string) []tool.Tool {
 		readFile{forbidRoots: rs},
 		listDir{forbidRoots: rs},
 		globTool{forbidRoots: rs},
+		codeIndex{forbidRoots: rs},
 	}
 }
 

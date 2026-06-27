@@ -248,3 +248,44 @@ func TestConfineReadBlocksGrepFile(t *testing.T) {
 		t.Error("unconfined grep should find the needle")
 	}
 }
+
+func TestConfineReadBlocksNativeGrepDirectoryRoot(t *testing.T) {
+	root := t.TempDir()
+	forbidDir := filepath.Join(root, "secret")
+	secretPath := filepath.Join(forbidDir, "secret.txt")
+	if err := os.MkdirAll(forbidDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(secretPath, []byte("needle in a haystack"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	g := grepTool{workDir: root, forbidRoots: realRoots([]string{forbidDir})}
+	out, err := g.Execute(context.Background(), argsJSON(t, map[string]any{"pattern": "needle", "path": "secret"}))
+	if err != nil {
+		t.Fatalf("grep forbidden directory should look empty, got error: %v", err)
+	}
+	if out != "(no matches)" {
+		t.Fatalf("grep forbidden directory = %q, want (no matches)", out)
+	}
+}
+
+func TestConfineReadFiltersPlainGlobMatches(t *testing.T) {
+	root := t.TempDir()
+	forbidDir := filepath.Join(root, "secret")
+	if err := os.MkdirAll(forbidDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(forbidDir, "secret.go"), []byte("package secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	g := globTool{workDir: root, forbidRoots: realRoots([]string{forbidDir})}
+	out, err := g.Execute(context.Background(), argsJSON(t, map[string]any{"pattern": "secret/*.go"}))
+	if err != nil {
+		t.Fatalf("glob forbidden directory: %v", err)
+	}
+	if out != "(no matches)" {
+		t.Fatalf("glob leaked forbidden paths:\n%s", out)
+	}
+}
