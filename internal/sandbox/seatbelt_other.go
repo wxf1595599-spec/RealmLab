@@ -2,12 +2,12 @@
 
 package sandbox
 
-import "os/exec"
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+)
 
-// Command runs the command unwrapped: no OS sandbox is implemented for this
-// platform yet (Linux bubblewrap/landlock is the next step). The permission
-// layer still gates the call.
-//
 // When spec.Mode is "enforce" and bubblewrap (bwrap) is available on PATH,
 // the command is wrapped in a bubblewrap sandbox with a profile analogous to
 // macOS Seatbelt: writes confined to WriteRoots, network denied unless
@@ -67,6 +67,9 @@ func bwrapArgs(spec Spec, sh Shell, command string) []string {
 	for _, root := range spec.WriteRoots {
 		args = append(args, "--bind", root, root)
 	}
+	for _, root := range linuxWriteDirs() {
+		args = append(args, "--bind", root, root)
+	}
 	for _, root := range spec.ForbidReadRoots {
 		args = append(args, "--tmpfs", root)
 	}
@@ -91,8 +94,45 @@ func bwrapArgsForArgs(spec Spec, args []string) []string {
 	for _, root := range spec.WriteRoots {
 		out = append(out, "--bind", root, root)
 	}
+	for _, root := range linuxWriteDirs() {
+		out = append(out, "--bind", root, root)
+	}
 	for _, root := range spec.ForbidReadRoots {
 		out = append(out, "--tmpfs", root)
 	}
 	return append(out, args...)
+}
+
+func linuxWriteDirs() []string {
+	dirs := []string{}
+	if td := os.TempDir(); td != "" && td != "/tmp" {
+		dirs = append(dirs, td)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		for _, sub := range []string{".cache", ".cargo", ".npm", "go"} {
+			dirs = append(dirs, filepath.Join(home, sub))
+		}
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(dirs))
+	for _, d := range dirs {
+		abs, err := filepath.Abs(d)
+		if err != nil {
+			continue
+		}
+		if real, err := filepath.EvalSymlinks(abs); err == nil {
+			abs = real
+		}
+		if abs == "/tmp" || seen[abs] || !dirExists(abs) {
+			continue
+		}
+		seen[abs] = true
+		out = append(out, abs)
+	}
+	return out
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
