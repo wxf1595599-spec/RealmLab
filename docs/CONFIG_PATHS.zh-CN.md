@@ -76,13 +76,14 @@ command = "example-mcp-server"
 `api_key_env` 保存到 `config.toml`，并把真实密钥值写入全局 `.env` 中同名的 key。
 生成结果是稳定的，因此同一个 provider 重启后仍会读取同一个凭据槽位。
 
-桌面端设置页会根据 provider 名称生成默认值。能规范化成 ASCII 的名称会得到可读的
+Reasonix 会根据 provider 名称生成默认值。能规范化成 ASCII 的名称会得到可读的
 env 名，例如 `LOCAL_GATEWAY_API_KEY`；如果名称全部由中文等非 ASCII 字符组成，则会
 生成带稳定 hash 后缀的名称，例如 `CUSTOM_d39b9067_API_KEY`，避免多个中文 provider
 都共用 `CUSTOM_API_KEY`。
 
-CLI 的自定义 provider 向导会根据 base URL 生成默认值，例如
-`https://token.sensenova.cn/v1` 会生成 `CUSTOM_TOKEN_SENSENOVA_CN_API_KEY`。
+CLI 的自定义 provider 向导会先根据 base URL 生成 provider 名称，再套用同一套
+provider-name 规则。例如 `https://token.sensenova.cn/v1` 会生成 provider 名
+`custom-token-sensenova-cn`，默认 key env 是 `CUSTOM_TOKEN_SENSENOVA_CN_API_KEY`。
 直接回车会接受这个默认值；如果你确实想让多个 provider 共用一个凭据，也可以手动输入
 `CUSTOM_API_KEY` 或其他自定义 env 名。
 

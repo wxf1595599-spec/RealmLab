@@ -1194,25 +1194,28 @@ func TestProviderSlug(t *testing.T) {
 	})
 }
 
-func TestCustomProviderAPIKeyEnv(t *testing.T) {
+func TestAPIKeyEnvFromProviderName(t *testing.T) {
 	cases := []struct {
-		name, baseURL, want string
+		name, providerName, want string
 	}{
-		{"standard host", "https://token.sensenova.cn/v1", "CUSTOM_TOKEN_SENSENOVA_CN_API_KEY"},
-		{"localhost with port", "http://localhost:11434/v1", "CUSTOM_LOCALHOST_11434_API_KEY"},
+		{"custom host slug", "custom-token-sensenova-cn", "CUSTOM_TOKEN_SENSENOVA_CN_API_KEY"},
+		{"localhost slug with port", "custom-localhost-11434", "CUSTOM_LOCALHOST_11434_API_KEY"},
+		{"desktop-style custom name", "Local Gateway", "LOCAL_GATEWAY_API_KEY"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := customProviderAPIKeyEnv(tc.baseURL); got != tc.want {
-				t.Errorf("customProviderAPIKeyEnv(%q) = %q, want %q", tc.baseURL, got, tc.want)
+			if got := apiKeyEnvFromProviderName(tc.providerName); got != tc.want {
+				t.Errorf("apiKeyEnvFromProviderName(%q) = %q, want %q", tc.providerName, got, tc.want)
 			}
 		})
 	}
 
-	t.Run("non-ascii host does not collapse to shared custom key", func(t *testing.T) {
-		got := customProviderAPIKeyEnv("https://例子.测试/v1")
-		if got == "CUSTOM_API_KEY" || !strings.HasPrefix(got, "CUSTOM_") || !strings.HasSuffix(got, "_API_KEY") {
-			t.Errorf("customProviderAPIKeyEnv(non-ascii) = %q, want stable CUSTOM_<hash>_API_KEY", got)
+	t.Run("non-ascii provider names use desktop-compatible hash fallback", func(t *testing.T) {
+		if got, want := apiKeyEnvFromProviderName("商汤"), "CUSTOM_d39b9067_API_KEY"; got != want {
+			t.Errorf("apiKeyEnvFromProviderName(non-ascii) = %q, want %q", got, want)
+		}
+		if got := apiKeyEnvFromProviderName("通义千问"); got == "CUSTOM_d39b9067_API_KEY" || got == "CUSTOM_API_KEY" {
+			t.Errorf("apiKeyEnvFromProviderName(second non-ascii) = %q, want distinct stable fallback", got)
 		}
 	})
 }
