@@ -194,12 +194,24 @@ func TestReadFileRef(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "sub", "nested.txt"), []byte("nested"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(dir, "node_modules", "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "node_modules", "pkg", "noise.js"), []byte("noise"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	got, isDir, err := readFileRef(dir, "")
 	if err != nil || !isDir {
 		t.Fatalf("dir = (isDir=%v, err=%v)", isDir, err)
 	}
+	if !strings.Contains(got, "directory listing only") || !strings.Contains(got, "file contents are not inlined") {
+		t.Errorf("dir listing = %q, want a directory reference note", got)
+	}
 	if !strings.Contains(got, "hello.txt") || !strings.Contains(got, "sub/") || !strings.Contains(got, "sub/nested.txt") {
 		t.Errorf("dir listing = %q, want hello.txt, sub/, and sub/nested.txt", got)
+	}
+	if strings.Contains(got, "node_modules") || strings.Contains(got, "noise.js") {
+		t.Errorf("dir listing = %q, want generated/vendor directories skipped", got)
 	}
 
 	// Missing path: error.
@@ -366,6 +378,29 @@ func TestReadFileRefWithBaseDir(t *testing.T) {
 	}
 	if got2 != "hello" {
 		t.Errorf("got %q, want %q", got2, "hello")
+	}
+
+	if err := os.MkdirAll(filepath.Join(sub, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "src", "main.go"), []byte("package main"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(sub, "dist"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "dist", "bundle.js"), []byte("generated"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gotDir, isDir, err := readFileRef("proj", base)
+	if err != nil || !isDir {
+		t.Fatalf("readFileRef scoped dir = (isDir=%v, err=%v)", isDir, err)
+	}
+	if !strings.Contains(gotDir, "directory listing only") || !strings.Contains(gotDir, "src/") || !strings.Contains(gotDir, "src/main.go") {
+		t.Fatalf("scoped dir listing missing contract or nested file:\n%s", gotDir)
+	}
+	if strings.Contains(gotDir, "dist/") || strings.Contains(gotDir, "bundle.js") {
+		t.Fatalf("scoped dir listing should skip generated dirs:\n%s", gotDir)
 	}
 }
 
@@ -582,6 +617,7 @@ func TestRegisterExternalFolderRefResolvesScopedDir(t *testing.T) {
 		t.Fatalf("ResolveScopedRefs errors = %v", errs)
 	}
 	if !strings.Contains(block, `<dir path="`+expectedDisplayPath+`">`) ||
+		!strings.Contains(block, "directory listing only") ||
 		!strings.Contains(block, "sub/") ||
 		!strings.Contains(block, "sub/outside.txt") {
 		t.Fatalf("registered external folder should resolve as a dir listing:\n%s", block)

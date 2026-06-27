@@ -409,14 +409,14 @@ func sortExternalFolderRefEntries(entries []ExternalFolderRefEntry) {
 
 func skipRefDirEntry(name string, isDir bool) bool {
 	switch name {
-	case ".DS_Store":
+	case ".DS_Store", "Thumbs.db":
 		return true
 	}
 	if !isDir {
 		return false
 	}
 	switch name {
-	case ".git", "node_modules", "__pycache__", ".idea", ".vscode":
+	case ".codex", ".git", ".idea", ".npm", ".pnpm-store", ".vscode", "__pycache__", "build", "dist", "node_modules":
 		return true
 	}
 	return false
@@ -809,6 +809,12 @@ func appendRefBlock(b *strings.Builder, tag, attr, body string) {
 // can't blow the context window.
 const maxDirEntries = 100
 
+const maxDirDepth = 16
+
+func directoryRefNote() string {
+	return fmt.Sprintf("[directory listing only; file contents are not inlined. Mention a listed file path to read its content. Common generated/vendor folders are skipped. Listing is capped at %d entries and %d nested levels.]", maxDirEntries, maxDirDepth)
+}
+
 // readFileRef reads an @-referenced path for injection. A directory yields a
 // recursive listing capped at maxDirEntries; a binary file (NUL in the first
 // 8 KiB) is noted rather than dumped; a large file is truncated to
@@ -843,6 +849,8 @@ func readFileRef(path, baseDir string) (content string, isDir bool, err error) {
 	}
 	if info.IsDir() {
 		var b strings.Builder
+		b.WriteString(directoryRefNote())
+		b.WriteString("\n\n")
 		n := 0
 		err := walkRootDir(root, rel, rel, &b, &n, 0)
 		if n >= maxDirEntries {
@@ -892,6 +900,8 @@ func readFileRefUnscoped(path string) (content string, isDir bool, err error) {
 	}
 	if info.IsDir() {
 		var b strings.Builder
+		b.WriteString(directoryRefNote())
+		b.WriteString("\n\n")
 		n := 0
 		err := filepath.WalkDir(path, func(p string, d os.DirEntry, wErr error) error {
 			if wErr != nil {
@@ -903,11 +913,11 @@ func readFileRefUnscoped(path string) (content string, isDir bool, err error) {
 			if p == path {
 				return nil
 			}
-			if d.IsDir() {
-				switch d.Name() {
-				case ".git", "node_modules", ".DS_Store", "__pycache__", ".idea", ".vscode":
+			if skipRefDirEntry(d.Name(), d.IsDir()) {
+				if d.IsDir() {
 					return filepath.SkipDir
 				}
+				return nil
 			}
 			rel, rErr := filepath.Rel(path, p)
 			if rErr != nil {
@@ -971,7 +981,7 @@ func imageFileRefNote(displayPath, mime string, size int64, attached bool) strin
 // entry relative to base (skipping noisy ones like .git and node_modules) into b
 // until n hits maxDirEntries.
 func walkRootDir(root *os.Root, dir, base string, b *strings.Builder, n *int, depth int) error {
-	if depth > 16 || *n >= maxDirEntries {
+	if depth > maxDirDepth || *n >= maxDirEntries {
 		return nil
 	}
 	f, err := root.Open(dir)
@@ -983,6 +993,12 @@ func walkRootDir(root *os.Root, dir, base string, b *strings.Builder, n *int, de
 	if err != nil {
 		return err
 	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].IsDir() != entries[j].IsDir() {
+			return entries[i].IsDir()
+		}
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
 	for _, e := range entries {
 		if *n >= maxDirEntries {
 			return nil
