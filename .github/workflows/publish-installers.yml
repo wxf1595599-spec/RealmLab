@@ -53,8 +53,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
 
       - name: Install Windows packaging dependencies
         if: runner.os == 'Windows'
