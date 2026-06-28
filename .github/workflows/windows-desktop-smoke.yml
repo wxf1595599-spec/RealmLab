@@ -1,0 +1,139 @@
+name: Windows desktop smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main-v2]
+    paths:
+      - ".github/workflows/windows-desktop-smoke.yml"
+      - "desktop/**"
+      - "internal/**"
+      - "scripts/desktop-build.sh"
+  push:
+    branches: [main-v2]
+    paths:
+      - ".github/workflows/windows-desktop-smoke.yml"
+      - "desktop/**"
+      - "internal/**"
+      - "scripts/desktop-build.sh"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-desktop-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: windows (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64
+            runner: windows-latest
+            platform: windows/amd64
+            arch: amd64
+          - name: arm64
+            runner: windows-11-arm
+            platform: windows/arm64
+            arch: arm64
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: desktop/go.mod
+          cache: true
+          cache-dependency-path: desktop/go.sum
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+
+      - name: Install NSIS
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> "$GITHUB_PATH"
+
+      - name: Install Wails CLI
+        run: |
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+
+      - name: Desktop Go tests
+        working-directory: desktop
+        run: go test ./...
+
+      - name: Frontend build and Windows-relevant UI contracts
+        run: |
+          corepack pnpm --dir desktop/frontend install --frozen-lockfile
+          corepack pnpm --dir desktop/frontend build
+          corepack pnpm --dir desktop/frontend exec tsx src/__tests__/composer-voice-input.test.tsx
+          corepack pnpm --dir desktop/frontend exec tsx src/__tests__/app-chrome-tabs.test.ts
+
+      - name: Build Windows installer and portable zip
+        run: scripts/desktop-build.sh "${{ matrix.platform }}" "v0.0.0-smoke.${{ github.run_number }}" "smoke"
+
+      - name: Launch portable app smoke
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "desktop/build/bin/RealmLab.exe"
+          $process = $null
+          try {
+            $process = Start-Process -FilePath $exe -PassThru
+            Start-Sleep -Seconds 12
+            if ($process.HasExited) {
+              throw "RealmLab exited during Windows launch smoke with code $($process.ExitCode)"
+            }
+          } finally {
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+      - name: Verify Windows artifacts
+        shell: pwsh
+        run: |
+          $installer = "dist/RealmLab-windows-${{ matrix.arch }}-installer.exe"
+          $portable = "dist/RealmLab-windows-${{ matrix.arch }}.zip"
+          foreach ($path in @($installer, $portable)) {
+            if (-not (Test-Path $path)) {
+              throw "Missing expected artifact: $path"
+            }
+            if ((Get-Item $path).Length -le 0) {
+              throw "Artifact is empty: $path"
+            }
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $portable))
+          try {
+            $names = $zip.Entries | ForEach-Object { $_.FullName }
+            if ($names -notcontains "RealmLab.exe") {
+              throw "Portable zip does not contain RealmLab.exe"
+            }
+          } finally {
+            $zip.Dispose()
+          }
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-smoke-${{ matrix.name }}
+          path: |
+            dist/RealmLab-windows-${{ matrix.arch }}-installer.exe
+            dist/RealmLab-windows-${{ matrix.arch }}.zip
+          if-no-files-found: error
