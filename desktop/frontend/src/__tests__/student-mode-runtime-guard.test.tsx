@@ -65,6 +65,12 @@ ok(
   "student mode toolbar button is disabled by the runtime guard",
 );
 ok(
+  appSource.includes("app--mode-transition-stable") &&
+    appSource.includes("setModeTransitionStable(true)") &&
+    appSource.includes("setModeTransitionStable(false)"),
+  "student mode and composer mode switches use a brief transition-stable frame",
+);
+ok(
   /studentModeTooltipLabel\s*=\s*studentModeSwitchBlocked && !studentModeSyncing\s*\?\s*t\("common\.busyHint"\)/.test(appSource) &&
     appSource.includes("label={studentModeTooltipLabel}"),
   "student mode toolbar explains the busy runtime guard",

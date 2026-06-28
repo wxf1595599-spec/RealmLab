@@ -1943,6 +1943,19 @@ a[href] {
   font-size: 13.5px;
 }
 
+.app--mode-transition-stable .sidebar,
+.app--mode-transition-stable .topicbar,
+.app--mode-transition-stable .transcript,
+.app--mode-transition-stable .chat-pane,
+.app--mode-transition-stable .composer-wrap,
+.app--mode-transition-stable .composer-card,
+.app--mode-transition-stable .composer-modebar__thumb,
+.app--mode-transition-stable .welcome__brand-logo,
+.app--mode-transition-stable .sidebar__brand-logo {
+  transition: none !important;
+  animation: none !important;
+}
+
 .layout {
   --sidebar-width: var(--sidebar-expanded-width, clamp(264px, 18vw, 300px));
   --chat-min-width: 760px;

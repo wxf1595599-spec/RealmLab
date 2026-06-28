@@ -930,6 +930,22 @@ export default function App() {
   const [sidebarTogglePressed, setSidebarTogglePressed] = useState(false);
   const [studentModeEnabled, setStudentModeEnabled] = useState(false);
   const [studentModeSyncing, setStudentModeSyncing] = useState(false);
+  const [modeTransitionStable, setModeTransitionStable] = useState(false);
+  const modeTransitionStableTimerRef = useRef<number | null>(null);
+  const markModeTransitionStable = useCallback((durationMs = 180) => {
+    setModeTransitionStable(true);
+    if (modeTransitionStableTimerRef.current !== null) window.clearTimeout(modeTransitionStableTimerRef.current);
+    modeTransitionStableTimerRef.current = window.setTimeout(() => {
+      modeTransitionStableTimerRef.current = null;
+      setModeTransitionStable(false);
+    }, durationMs);
+  }, []);
+  useEffect(() => () => {
+    if (modeTransitionStableTimerRef.current !== null) {
+      window.clearTimeout(modeTransitionStableTimerRef.current);
+      modeTransitionStableTimerRef.current = null;
+    }
+  }, []);
   const [workspaceTogglePressed, setWorkspaceTogglePressed] = useState(false);
   const [clearContextPending, setClearContextPending] = useState(false);
   const topicRenameSkipCommitRef = useRef(false);
@@ -1300,14 +1316,16 @@ export default function App() {
   // normal clears both.
   const applyMode = useCallback(
     (m: Mode) => {
+      markModeTransitionStable();
       userPlanModeByTabRef.current = updateUserPlanModeIntent(userPlanModeByTabRef.current, activeTabId, modeHasPlan(m));
       patchActiveComposerProfile(composerProfileWithMode(m), ["collaborationMode", "toolApprovalMode", "goal"]);
       void syncModeToController(m);
     },
-    [activeTabId, patchActiveComposerProfile, syncModeToController],
+    [activeTabId, markModeTransitionStable, patchActiveComposerProfile, syncModeToController],
   );
   const applyCollaborationMode = useCallback(
     (m: CollaborationMode, options: { rememberUserIntent?: boolean } = {}): Promise<void> => {
+      markModeTransitionStable();
       if (options.rememberUserIntent !== false) {
         userPlanModeByTabRef.current = updateUserPlanModeIntent(userPlanModeByTabRef.current, activeTabId, m === "plan");
       }
@@ -1318,11 +1336,12 @@ export default function App() {
       patchActiveComposerProfile({ collaborationMode: m, goalDraftMode: false, goal: "" }, ["collaborationMode", "goal"]);
       return setControllerCollaborationMode(m);
     },
-    [activeTabId, patchActiveComposerProfile, setControllerCollaborationMode],
+    [activeTabId, markModeTransitionStable, patchActiveComposerProfile, setControllerCollaborationMode],
   );
   const applyToolApprovalMode = useCallback(
     (m: ToolApprovalMode) => {
       if (!activeTabId) return;
+      markModeTransitionStable();
       if (m === "yolo") {
         if (toolApprovalMode !== "yolo") {
           yoloRestoreToolApprovalModesRef.current[activeTabId] = restorableToolApprovalMode(toolApprovalMode);
@@ -1333,7 +1352,7 @@ export default function App() {
       patchActiveComposerProfile({ toolApprovalMode: m }, ["toolApprovalMode"]);
       void setControllerToolApprovalMode(m);
     },
-    [activeTabId, patchActiveComposerProfile, setControllerToolApprovalMode, toolApprovalMode],
+    [activeTabId, markModeTransitionStable, patchActiveComposerProfile, setControllerToolApprovalMode, toolApprovalMode],
   );
   useEffect(() => {
     if (!studentModeEnabled) return;
@@ -1357,6 +1376,7 @@ export default function App() {
       return;
     }
     const nextEnabled = !studentModeEnabled;
+    markModeTransitionStable(240);
     setStudentModeEnabled(nextEnabled);
     setStudentModeSyncing(true);
     try {
@@ -1369,9 +1389,10 @@ export default function App() {
       setStudentModeEnabled(studentModeEnabled);
       showToast(t("topicBar.studentModeSyncFailed"), "warn");
     } finally {
+      markModeTransitionStable();
       setStudentModeSyncing(false);
     }
-  }, [controllerReady, showToast, studentModeEnabled, studentModeSwitchBlocked, studentModeSyncing, t]);
+  }, [controllerReady, markModeTransitionStable, showToast, studentModeEnabled, studentModeSwitchBlocked, studentModeSyncing, t]);
   useEffect(() => {
     if (!activeTabId || !controllerReady) return;
     void app.SetStudentMode(studentModeEnabled).catch((error) => {
@@ -2677,6 +2698,7 @@ export default function App() {
         "app",
         `app--${desktopPlatform}`,
         browserPreviewChrome ? "app--browser-preview" : "",
+        modeTransitionStable ? "app--mode-transition-stable" : "",
         studentModeEnabled ? "app--student-mode" : "",
         sidebarWorkbench ? "app--workbench" : "",
         sidebarCreation ? "app--creation" : "",
