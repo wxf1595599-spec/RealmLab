@@ -1,29 +1,31 @@
 name: Bug report
-description: Report a bug in DeepSeek-Reasonix
+description: Report a bug in RealmLab
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for filing a bug. Pick which version line you're on below — it gets
-        labeled (`v1`/`v2`) automatically, no maintainer action needed.
+        Thanks for filing a bug. Please include the RealmLab version and the
+        platform where you saw the issue.
   - type: dropdown
-    id: version-line
+    id: surface
     attributes:
-      label: Version line
-      description: Which line are you running?
+      label: Product surface
+      description: Where did this happen?
       options:
-        - "v2 — Go rewrite (1.x), main-v2 (active development)"
-        - "v1 — Legacy TypeScript (0.x), maintenance only"
+        - "RealmLab desktop app"
+        - "Installer or update flow"
+        - "Local agent/runtime"
+        - "Documentation"
     validations:
       required: true
   - type: input
     id: version
     attributes:
       label: Exact version
-      description: Output of `reasonix --version`.
-      placeholder: e.g. 1.0.0
+      description: RealmLab version or commit.
+      placeholder: e.g. v0.1.0
     validations:
       required: true
   - type: textarea

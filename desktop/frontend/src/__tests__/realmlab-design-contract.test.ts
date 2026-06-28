@@ -41,6 +41,21 @@ const welcomeSource = readFileSync(resolve(frontendRoot, "src/components/Welcome
 const sidebarLogo = readFileSync(resolve(frontendRoot, "src/assets/logo-wordmark.svg"), "utf8");
 const welcomeLogo = readFileSync(resolve(frontendRoot, "src/assets/logo-wordmark-login.svg"), "utf8");
 const studentWelcomeLogo = readFileSync(resolve(frontendRoot, "src/assets/logo-wordmark-student.svg"), "utf8");
+const publicBrandFiles = [
+  "README.md",
+  "README.zh-CN.md",
+  "SECURITY.md",
+  "CONTRIBUTING.md",
+  "desktop/README.md",
+  "docs/RELEASING.md",
+  "docs/logo.svg",
+  ".github/ISSUE_TEMPLATE/bug_report.yml",
+  ".github/ISSUE_TEMPLATE/config.yml",
+  ".github/ISSUE_TEMPLATE/feature_request.yml",
+];
+const publicBrandDocs = publicBrandFiles
+  .map((file) => `\n--- ${file} ---\n${readFileSync(resolve(repoRoot, file), "utf8")}`)
+  .join("\n");
 const localeSources = ["en.ts", "zh.ts", "zh-TW.ts"]
   .map((file) => readFileSync(resolve(frontendRoot, "src/locales", file), "utf8"))
   .join("\n");
@@ -69,6 +84,8 @@ includes(siteBrief, "`site/` 是上游兼容 marketing surface", "site brief kee
 includes(siteBrief, "让本地代码工作变得可控、可见、可恢复", "site brief inherits the RealmLab north star");
 includes(siteCSS, "RealmLab-compatible upstream marketing surface", "site CSS declares its compatibility boundary");
 excludes(siteCSS, "Reasonix marketing site", "site CSS no longer identifies as the Reasonix marketing site");
+ok(!/(?:Reasonix|DeepSeek-Reasonix|resonix)/i.test(publicBrandDocs), "public README/security/contribution surfaces avoid legacy upstream branding");
+includes(publicBrandDocs, "MicroRealm Lab", "public docs use the MicroRealm Lab product identity");
 
 includes(themeSource, 'export const REALMLAB_DEFAULT_THEME: Theme = "light";', "default desktop theme stays light");
 includes(themeSource, 'export const REALMLAB_DEFAULT_THEME_STYLE: ThemeStyle = "slate";', "default desktop theme style stays Slate");

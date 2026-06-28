@@ -1,75 +1,67 @@
 # Releasing
 
-How Reasonix ships, who can ship what, and the canary-before-stable flow.
+RealmLab releases are desktop-first. A release should publish source code plus
+verified macOS and Windows packages from the same commit.
 
-## Branch model: trunk + tags
+## Branch And Tag Model
 
-- **`main-v2`** is the single development line (the v2 / 1.x trunk). Every PR merges here.
-- **Production is a tag, not a branch.** A release is a tagged snapshot of `main-v2`:
-  `v1.4.0` (CLI), `npm-v1.4.0` (npm), `desktop-v1.4.0` (desktop).
-- **`v1`** is the archived 1.0/legacy line — maintenance only.
-- **Hotfix** an already-released version by branching from its tag, fixing, and tagging again.
+- `main` is the public source branch for RealmLab.
+- Stable desktop releases use tags named `realmlab-vX.Y.Z`.
+- The tag points at the exact source commit used for both macOS and Windows
+  packages.
 
-There is no separate "production" or "develop" branch by design — the canary channel
-provides the pre-release buffer instead of a long-lived branch.
+## Release Workflow
 
-## Channels
+The `Publish installers` workflow runs on `realmlab-v*` tags and can also be
+started manually.
 
-| Surface | Stable | Pre-release buffer |
-|---|---|---|
-| npm | `latest` (0.x), `next` (1.x) | `canary` (`npm i reasonix@canary`) |
-| Desktop | R2 `latest/` pointer | R2 `canary/` pointer (R2-only — never on the GitHub releases page) |
+Each release build:
 
-A canary build is isolated: it **never** moves `latest` / `next` / desktop `latest/`.
-Testers opt in explicitly. (Desktop builds carry `-X main.channel=canary`; npm versions
-ending in `-canary.N` publish under the `canary` dist-tag.)
+1. Checks out the tagged source.
+2. Installs Go, Node, pnpm, Wails, and platform packaging tools.
+3. Runs the RealmLab design contract tests on both macOS and Windows runners.
+4. Builds platform packages with `scripts/desktop-build.sh`.
+5. Runs post-build UI parity tests.
+6. Verifies installer artifacts exist and are non-empty.
+7. Uploads the packages to the GitHub Release.
 
-## Who can release what
+## Expected Assets
 
-| Action | Who | Mechanism |
-|---|---|---|
-| **Cut a canary** | any maintainer (write access) | `workflow_dispatch`, runs free (open `canary` environment) |
-| **Ship `next` / stable** | **esengine only** | stable publish jobs gate on the `release` environment — esengine must approve before anything goes public |
+| Platform | Asset |
+| --- | --- |
+| macOS | `RealmLab-darwin-universal.dmg` |
+| macOS | `RealmLab-darwin-arm64.zip` |
+| macOS | `RealmLab-darwin-amd64.zip` |
+| Windows | `RealmLab-windows-amd64-installer.exe` |
+| Windows | `RealmLab-windows-amd64.zip` |
 
-So a maintainer can dispatch a canary anytime, but a stable release — even one a
-maintainer starts by pushing a tag — pauses in the Actions UI until **esengine approves**
-the `release` environment deployment.
+## Cut A Release
 
-> Repo settings backing this: Environments → `release` has esengine as a required
-> reviewer; `canary` has none. (Optional hardening: a tag ruleset restricting
-> `v*`/`npm-v*`/`desktop-v*` creation to esengine, so maintainers can't even start a
-> stable release.)
+```sh
+git tag -f realmlab-v0.1.0 HEAD
+git push --force github-new refs/tags/realmlab-v0.1.0
+gh run watch --repo wxf1595599-spec/RealmLab --workflow publish-installers.yml
+gh release view realmlab-v0.1.0 --repo wxf1595599-spec/RealmLab
+```
 
-## The release loop
+## UI Parity Requirement
 
-1. **Develop** — PRs land on `main-v2` (branch auto-deletes on merge).
-2. **Cut a canary** before the intended release (e.g. heading for `1.4.0`):
-   - Desktop: Actions → **Release desktop** → `channel: canary`, `base_version: 1.4.0`
-   - CLI: Actions → **Release npm** → `base_version: 1.4.0`
-   - Publishes `1.4.0-canary.N` to the desktop R2 `canary/` pointer (no GitHub release) and npm `@canary`.
-3. **Test** — testers install `reasonix@canary` (CLI) or grab the desktop canary
-   build from its R2 link, and report bugs.
-4. **Fix** on `main-v2` via PRs; re-cut the canary as needed (`canary.N` bumps).
-5. **Ship stable** when the canary is clean — push the three tags:
-   ```sh
-   git tag v1.4.0         && git push origin v1.4.0          # CLI binaries + Homebrew
-   git tag npm-v1.4.0     && git push origin npm-v1.4.0      # npm -> next
-   git tag desktop-v1.4.0 && git push origin desktop-v1.4.0  # desktop -> R2 latest/
-   ```
-   Each stable run **waits for esengine to approve the `release` environment** before publishing.
-6. **Promote to default install** (optional, when 1.x should become the bare `npm i` target):
-   ```sh
-   npm dist-tag add reasonix@1.4.0 latest
-   ```
-7. **Next cycle** — the canary rolls on toward `1.5.0`.
+macOS and Windows packages must use the same frontend source and pass the same
+design contract tests. Any release that changes desktop layout, branding,
+theme, app chrome, installer identity, or the context/status surfaces should be
+checked on both platforms before promotion.
 
-## Notes
+## Local Verification
 
-- Canary version numbers use the workflow `run_number`, so the desktop and CLI canary
-  numbers differ (e.g. `canary.11` vs `canary.2`). Only monotonicity per channel matters.
-- A stable `-rc` tag (e.g. `npm-v1.4.0-rc.1`) still ships under `next`, not `canary`.
-- Desktop in-app updates use R2 first. Stable has a GitHub release fallback; canary is
-  R2-only and never appears on the GitHub releases page.
-- Windows and Linux apply downloaded, minisign-verified artifacts in place. macOS
-  applies in-app only for Developer ID signed and notarized builds; ad-hoc/local
-  builds fall back to the download page.
+```sh
+corepack pnpm --dir desktop/frontend install --frozen-lockfile
+corepack pnpm --dir desktop/frontend exec tsx src/__tests__/realmlab-design-contract.test.ts
+corepack pnpm --dir desktop/frontend exec tsx src/__tests__/context-panel-breakdown.test.ts
+```
+
+For packaged builds:
+
+```sh
+scripts/desktop-build.sh darwin/universal v0.1.0 stable
+scripts/desktop-build.sh windows/amd64 v0.1.0 stable
+```

@@ -1,204 +1,100 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="Reasonix" width="640"/>
+  <img src="desktop/frontend/src/assets/logo-wordmark.svg" alt="MicroRealm Lab" width="560"/>
 </p>
 
 <p align="center">
   <strong>English</strong>
-  &nbsp;·&nbsp;
+  &nbsp;.&nbsp;
   <a href="./README.zh-CN.md">简体中文</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/GUIDE.md">Guide</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/SPEC.md">Spec</a>
-  &nbsp;·&nbsp;
-  <a href="https://esengine.github.io/DeepSeek-Reasonix/">Website</a>
-  &nbsp;·&nbsp;
-  <strong><a href="https://discord.gg/XF78rEME2D">Discord</a></strong>
+  &nbsp;.&nbsp;
+  <a href="./desktop/README.md">Desktop guide</a>
+  &nbsp;.&nbsp;
+  <a href="./docs/WINDOWS_DESKTOP_QA.md">Windows QA</a>
+  &nbsp;.&nbsp;
+  <a href="https://github.com/wxf1595599-spec/RealmLab/releases">Releases</a>
 </p>
 
-> [!IMPORTANT]
-> **Reasonix 1.0 is a ground-up rewrite in Go** — this branch (`main-v2`) is the new default and where development happens now.
-> The earlier `0.x` TypeScript releases are **legacy**, living on the [`v1`](https://github.com/esengine/DeepSeek-Reasonix/tree/v1) branch (maintenance only).
-> See the **[migration guide](./docs/MIGRATING.md)**. `npm i -g reasonix` stays the install command — `1.0.0`+ delivers the Go binary, `0.x` is the legacy TS build.
+# RealmLab
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/reasonix"><img src="https://img.shields.io/npm/v/reasonix.svg?style=flat-square&color=cb3837&labelColor=161b22&logo=npm&logoColor=white" alt="npm version"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/esengine/DeepSeek-Reasonix/ci.yml?style=flat-square&label=ci&labelColor=161b22&logo=githubactions&logoColor=white" alt="CI"/></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/npm/l/reasonix.svg?style=flat-square&color=8b949e&labelColor=161b22" alt="license"/></a>
-  <a href="https://www.npmjs.com/package/reasonix"><img src="https://img.shields.io/npm/dm/reasonix.svg?style=flat-square&color=3fb950&labelColor=161b22&label=downloads" alt="downloads"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/stargazers"><img src="https://img.shields.io/github/stars/esengine/DeepSeek-Reasonix.svg?style=flat-square&color=dbab09&labelColor=161b22&logo=github&logoColor=white" alt="GitHub stars"/></a>
-  <a href="https://atomgit.com/esengine/DeepSeek-Reasonix"><img src="https://atomgit.com/esengine/DeepSeek-Reasonix/star/badge.svg" alt="AtomGit stars"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors"><img src="https://img.shields.io/github/contributors/esengine/DeepSeek-Reasonix.svg?style=flat-square&color=bc8cff&labelColor=161b22&logo=github&logoColor=white" alt="contributors"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/discussions"><img src="https://img.shields.io/github/discussions/esengine/DeepSeek-Reasonix.svg?style=flat-square&color=58a6ff&labelColor=161b22&logo=github&logoColor=white" alt="Discussions"/></a>
-  <a href="https://discord.gg/XF78rEME2D"><img src="https://img.shields.io/badge/discord-join-5865F2.svg?style=flat-square&labelColor=161b22&logo=discord&logoColor=white" alt="Discord"/></a>
-</p>
+RealmLab is a local AI coding workspace for macOS and Windows. It wraps a
+coding agent, project sessions, tool permissions, context usage, and workspace
+history in a desktop experience designed to make local code work controlled,
+visible, and recoverable.
 
-<p align="center">
-  <a href="https://oosmetrics.com/repo/esengine/reasonix"><img src="https://api.oosmetrics.com/api/v1/badge/achievement/9e931d80-2050-4b10-902e-44970cc133ad.svg" alt="oosmetrics — Top 2 in Agents by velocity"/></a>
-  <a href="https://oosmetrics.com/repo/esengine/reasonix"><img src="https://api.oosmetrics.com/api/v1/badge/achievement/556d94b3-61b7-486b-baf2-888b9327deab.svg" alt="oosmetrics — Top 3 in LLMs by velocity"/></a>
-  <a href="https://oosmetrics.com/repo/esengine/reasonix"><img src="https://api.oosmetrics.com/api/v1/badge/achievement/0f457d4c-efca-4d15-ad2b-139691ff342c.svg" alt="oosmetrics — Top 3 in CLI by velocity"/></a>
-</p>
+The desktop product identity is **MicroRealm Lab**. Public documentation,
+release notes, installer names, and user-facing UI should use RealmLab /
+MicroRealm Lab consistently.
 
-<br/>
+## Download
 
-<h3 align="center">A DeepSeek-native AI coding agent for your terminal.</h3>
-<p align="center">A config- and plugin-driven harness — a single static Go binary, tuned around DeepSeek's prefix cache so token costs stay low across long sessions.</p>
+Installers are published on the GitHub Releases page:
 
-<br/>
+- macOS: `RealmLab-darwin-universal.dmg`
+- Windows: `RealmLab-windows-amd64-installer.exe`
+- Portable archives are also attached for both platforms.
 
-> [!IMPORTANT]
-> **Community · 加入社区** — bilingual Discord for setup help (`#help` / `#求助`), workflow showcases, and feature ideas. → **<https://discord.gg/XF78rEME2D>**
+[Download the latest RealmLab release](https://github.com/wxf1595599-spec/RealmLab/releases)
 
-<br/>
+## What It Does
 
-## Features
+- Keeps project sessions, context state, model output, and tool activity in one
+  desktop workspace.
+- Uses explicit tool permission modes so local edits and shell commands remain
+  auditable.
+- Shows context-window usage, runtime metrics, cost signals, and session status
+  without burying them in terminal output.
+- Preserves a consistent MicroRealm Lab UI across macOS and Windows through
+  shared frontend source and release-time design contract tests.
+- Supports rewind/checkpoint workflows so risky edits can be inspected and
+  recovered.
 
-- **Config-driven.** Providers, the agent, enabled tools, and plugins are all
-  declared in `reasonix.toml`. No hardcoded models.
-- **Multi-model & composable.** DeepSeek ships as a preset; any
-  OpenAI-compatible endpoint is a config entry, not new code. Optionally run
-  two models together (executor + planner) in separate, cache-stable sessions.
-- **Plugin-driven.** External tools run as subprocesses over stdio JSON-RPC
-  (MCP-compatible). Built-in tools self-register at compile time.
-- **Zero-friction distribution.** `CGO_ENABLED=0` single binary; cross-compile
-  to six targets with one command. The only dependency is a TOML parser.
+## Quick Start
 
-## Install
+1. Download the installer for your platform from Releases.
+2. Launch RealmLab.
+3. Connect a model provider in onboarding or Settings.
+4. Open a project folder and start a new session.
+
+## Build From Source
+
+Requirements:
+
+- Go 1.25+
+- Node.js 22+
+- pnpm 10 via Corepack
+- Wails CLI for desktop packaging
+
+Common commands:
 
 ```sh
-npm i -g reasonix                  # any OS; pulls the prebuilt native binary
-brew install esengine/reasonix/reasonix   # macOS
+corepack pnpm --dir desktop/frontend install --frozen-lockfile
+corepack pnpm --dir desktop/frontend exec tsx src/__tests__/realmlab-design-contract.test.ts
+scripts/desktop-build.sh darwin/universal v0.1.0 stable
+scripts/desktop-build.sh windows/amd64 v0.1.0 stable
 ```
 
-Prebuilt archives (`darwin|linux|windows × amd64|arm64`) and `SHA256SUMS` are on
-every [GitHub release](https://github.com/esengine/DeepSeek-Reasonix/releases).
+The release workflow runs the same design contract tests on macOS and Windows
+before packaging, then verifies platform-specific installer artifacts.
 
-### Code signing
+## Repository Map
 
-Windows builds are code-signed with a free certificate provided by the
-[SignPath Foundation](https://signpath.org/), with signing through
-[SignPath.io](https://signpath.io/).
+| Path | Purpose |
+| --- | --- |
+| `desktop/` | Wails desktop shell, packaging, platform assets |
+| `desktop/frontend/` | React UI, design system, desktop tests |
+| `internal/` | Agent runtime, tools, providers, sessions, permissions |
+| `docs/` | Product, release, QA, and engineering notes |
+| `.github/workflows/publish-installers.yml` | Cross-platform installer publishing |
 
-### Build from source
+## Brand Guard
+
+RealmLab public surfaces should not drift back to legacy upstream naming.
+Before publishing, run:
 
 ```sh
-make build      # -> bin/reasonix(.exe)
-make cross      # -> dist/ (darwin|linux|windows × amd64|arm64)
+corepack pnpm --dir desktop/frontend exec tsx src/__tests__/realmlab-design-contract.test.ts
 ```
 
-## Quick start
+## License
 
-```sh
-reasonix setup                      # config wizard → ./reasonix.toml
-export DEEPSEEK_API_KEY=sk-...      # or let setup save it to Reasonix home .env
-reasonix                            # then run /init to generate AGENTS.md (project memory)
-reasonix run "implement the TODOs in main.go"
-reasonix run --model deepseek-pro "add unit tests for this function"
-echo "explain this code" | reasonix run
-```
-
-## Configuration
-
-A minimal `reasonix.toml` — one provider and a default model — is enough to start:
-
-```toml
-default_model = "deepseek-flash"
-
-[[providers]]
-name        = "deepseek-flash"
-kind        = "openai"
-base_url    = "https://api.deepseek.com"
-model       = "deepseek-v4-flash"
-api_key_env = "DEEPSEEK_API_KEY"
-```
-
-Resolution order is **flag > `./reasonix.toml` > the user config file >
-built-in defaults**; starting with **Reasonix v1.8.1**, the user file lives at
-`~/.reasonix/config.toml` on macOS/Linux and
-`%AppData%\reasonix\config.toml` on Windows. See
-**[Configuration paths](./docs/CONFIG_PATHS.md)** for migration details and the
-full `config.toml` / `.env` structure. Provider entries name secrets with
-`api_key_env`; the secret values themselves live in Reasonix's global
-`<Reasonix home>/.env`, shared by CLI and desktop. Project `.env` files are not
-provider-key runtime fallbacks, but still feed workspace-scoped, non-provider
-`${VAR}` expansion for MCP/plugin settings without importing Reasonix control
-variables. Permissions, the sandbox, plugins (MCP), slash
-commands, `@` references, and two-model setup are all in the
-**[Guide](./docs/GUIDE.md)**.
-
-## Documentation
-
-- **[Guide](./docs/GUIDE.md)** — configuration, permissions & sandbox, plugins
-  (MCP), slash commands, `@` references, two-model collaboration.
-- **[Bot guide](./docs/BOT_GUIDE.md)** — connect Feishu, Lark, and WeChat bots
-  from the desktop app, then use approvals, YOLO, and commands from IM.
-- **[Spec](./docs/SPEC.md)** — engineering contract: architecture, registries,
-  data types, and roadmap.
-- **[Migrating from 0.x](./docs/MIGRATING.md)** — moving from the legacy
-  TypeScript releases to the 1.0 Go rewrite.
-- **[Checkpoints & rewind](./docs/CHECKPOINTS.md)** — the snapshot-based edit
-  safety net (Esc-Esc / `/rewind`).
-
-<br/>
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=esengine%2FDeepSeek-Reasonix&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=esengine/DeepSeek-Reasonix&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=esengine/DeepSeek-Reasonix&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=esengine/DeepSeek-Reasonix&type=date&legend=top-left" />
- </picture>
-</a>
-
-<br/>
-
-## Support
-
-If Reasonix has been useful and you'd like to say thanks, you can. It stays a coffee, not a contract — donations don't buy feature priority or change how issues get triaged.
-
-- **International** — PayPal: [paypal.me/yuhuahui](https://paypal.me/yuhuahui)
-- **国内** — 微信支付（扫码）
-
-<p align="center">
-  <img src=".github/sponsor/wechat-pay.jpg" alt="WeChat Pay QR code" width="240"/>
-</p>
-
-<br/>
-
-## Acknowledgments
-
-A small list of folks whose work has shaped Reasonix the most — measured
-by both commit count and code volume. **Listed alphabetically, no ordering
-of importance.** The full contributor graph is on
-[GitHub](https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors).
-
-- [**ctharvey**](https://github.com/ctharvey)
-- [**dimasd-angga**](https://github.com/dimasd-angga) (Dimas D. Angga)
-- [**Evan-Pycraft**](https://github.com/Evan-Pycraft)
-- [**ForeverYoungPp**](https://github.com/ForeverYoungPp)
-- [**GTC2080**](https://github.com/GTC2080) (TaoMu)
-- [**kabaka9527**](https://github.com/kabaka9527)
-- [**lisniuse**](https://github.com/lisniuse) (Richie)
-- [**wade19990814-hue**](https://github.com/wade19990814-hue)
-- [**wviana**](https://github.com/wviana) (Wesley Viana)
-
-Also a separate thank-you to [**Bernardxu123**](https://github.com/Bernardxu123)
-for designing the project logo, and to
-[AIGC Link](https://xhslink.com/m/80ngts127cA) for promoting the project on XiaoHongShu.
-
-<p align="center">
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=esengine/DeepSeek-Reasonix&max=100&columns=12" alt="Contributors to esengine/DeepSeek-Reasonix" width="860"/>
-  </a>
-</p>
-
-<br/>
-
----
-
-<p align="center">
-  <sub>MIT — see <a href="./LICENSE">LICENSE</a></sub>
-  <br/>
-  <sub>Built by the community at <a href="https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors">esengine/DeepSeek-Reasonix</a></sub>
-</p>
+MIT. See [LICENSE](./LICENSE).

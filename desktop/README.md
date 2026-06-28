@@ -1,9 +1,8 @@
-# RealmLab Desktop (Wails shell)
+# RealmLab Desktop
 
-A native desktop window around the Reasonix Go kernel. The same
-transport-agnostic `control.Controller` that backs the chat TUI and the HTTP/SSE
-server is bound **directly** to a React webview — Go methods in, typed events
-out, no HTTP hop.
+A native desktop window around the RealmLab agent runtime. The same
+transport-agnostic `control.Controller` that backs local sessions is bound
+**directly** to a React webview — Go methods in, typed events out, no HTTP hop.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,13 +22,13 @@ out, no HTTP hop.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## Why a nested module
+## Why A Nested Module
 
-`desktop/` is its own Go module (`module reasonix/desktop`, `replace reasonix =>
-../`). That keeps the CGO + WebKit desktop build entirely separate from the CLI's
-`CGO_ENABLED=0` single-static-binary guarantee: the parent module's `go build /
-vet / test ./...` skip this directory, while the import path stays under
-`reasonix/` so it can still import the `reasonix/internal/*` kernel.
+`desktop/` is its own Go module. That keeps the CGO + WebKit desktop build
+separate from the parent runtime's static-binary assumptions: the parent
+module's `go build / vet / test ./...` skip this directory, while the nested
+module can still import the shared internal runtime through its local replace
+directive.
 
 ## Prerequisites
 
@@ -191,14 +190,14 @@ handled here, and what to reach for if a target misbehaves:
   - **Wayland + NVIDIA**: On KDE Plasma Wayland with NVIDIA GPUs, WebKitGTK can
     crash at startup (`Error 71: Protocol error`) due to an upstream WebKit
     explicit-sync bug (WebKit #280210, #317089, NVIDIA/egl-wayland #179).
-    Reasonix automatically sets `__NV_DISABLE_EXPLICIT_SYNC=1` when it detects
+    RealmLab automatically sets `__NV_DISABLE_EXPLICIT_SYNC=1` when it detects
     Wayland + NVIDIA GPU. To opt out, set `__NV_DISABLE_EXPLICIT_SYNC=0`.
     Alternative fallbacks: `WEBKIT_DISABLE_DMABUF_RENDERER=1` (poor performance)
     or `GDK_BACKEND=x11` (forces XWayland).
 - **Windows / WebView2** — `Theme: SystemDefault` follows the OS light/dark
   setting; the installer embeds the WebView2 bootstrapper. Canary builds disable
   WebView2 GPU acceleration by default to smoke-test blank-window reports; set
-  `REASONIX_DESKTOP_DISABLE_WEBVIEW2_GPU=1` or `0` to force the fallback on or
+  `REALMLAB_DESKTOP_DISABLE_WEBVIEW2_GPU=1` or `0` to force the fallback on or
   off. The Windows parity gate and manual release checklist live in
   `docs/WINDOWS_DESKTOP_QA.md`.
 - **macOS / WebKit** — inset/hidden title bar (`TitleBarHiddenInset`); the CSS
@@ -233,7 +232,8 @@ desktop/
 
 ## Telemetry
 
-The desktop app sends one anonymous ping per launch to `crash.reasonix.io`:
+The desktop app can send one anonymous usage ping per launch to the configured
+RealmLab telemetry endpoint:
 a random install id (generated locally, tied to nothing), app version, OS,
 arch, and OS version. It exists solely to count active installs. It never
 includes conversations, API keys, file contents, or paths.
@@ -255,6 +255,5 @@ IR-overhead bucket, memory-reference count, constraint/risk/step counts, and
 memory-graph size buckets. It never uploads memory text, tool outputs, prompts,
 file paths, IDs, keys, base URLs, or file contents. The Memory v5 runtime itself
 is controlled from Settings > General > "Memory v5" and shares the user/global
-`agent.memory_compiler.enabled` setting with the CLI/TUI and `reasonix serve`;
-CLI users can also run `/memory-v5 off|on|status` in a session or
-`reasonix config memory-v5 off|on|status` from a shell.
+`agent.memory_compiler.enabled` setting with the local runtime; users can also
+toggle it from the session command palette where available.
