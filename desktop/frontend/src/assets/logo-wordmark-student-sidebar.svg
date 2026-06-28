@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 140" width="780" height="140" role="img" aria-label="MicroRealm Lab">
+  <text x="20" y="105" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="100" letter-spacing="-5" textLength="520" lengthAdjust="spacingAndGlyphs" text-rendering="geometricPrecision">
+    <tspan font-weight="600" fill="#2f6fe0">Micro</tspan><tspan font-weight="380" fill="#74a4ef">Realm</tspan>
+  </text>
+  <path fill="#2F6FE0" d="M574 49 C575.82 61.73 581.27 67.18 594 69 C581.27 70.82 575.82 76.27 574 89 C572.18 76.27 566.73 70.82 554 69 C566.73 67.18 572.18 61.73 574 49Z"/>
+  <text x="608" y="103" font-family="'Geist', 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="80" font-weight="500" letter-spacing="-3" fill="#9cbef2" text-rendering="geometricPrecision">Lab</text>
+</svg>

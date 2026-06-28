@@ -2292,13 +2292,16 @@ func (a *App) maybeAutoTitleTopic(tab *WorkspaceTab) bool {
 		return false
 	}
 	nextTitle, updated := autoTitleTopicFromSession(titleRoot, tab.TopicID, sessionPath)
-	if !updated {
-		return false
+	if updated {
+		a.updateOpenTopicTitle(tab.TopicID, nextTitle)
+		a.updateTopicSessionTitles(tab.TopicID, nextTitle)
+		a.emitProjectTreeChanged()
 	}
-	a.updateOpenTopicTitle(tab.TopicID, nextTitle)
-	a.updateTopicSessionTitles(tab.TopicID, nextTitle)
-	a.emitProjectTreeChanged()
-	return true
+	// Best-effort: once the first answer exists, upgrade the truncated auto title
+	// to a flash-model summary of the opening exchange. Async; manual renames and
+	// already-summarized titles are skipped; failures leave the truncated title.
+	a.maybeSummarizeTopicTitle(titleRoot, tab.TopicID, sessionPath)
+	return updated
 }
 
 func autoTitleTopicFromSession(workspaceRoot, topicID, sessionPath string) (string, bool) {
@@ -2331,11 +2334,16 @@ func topicTitleFromSession(path string) string {
 			return ""
 		}
 		if msg.Role == "user" {
-			content := control.StripComposePrefixes(agent.HandoffTask(msg.Content))
-			content = control.StripReferencedContextPrefix(content)
-			return topicTitleFromText(content)
+			return topicTitleFromUserContent(msg.Content)
 		}
 	}
+}
+
+func topicTitleFromUserContent(content string) string {
+	content = agent.UserPreviewText(content)
+	content = control.StripComposePrefixes(content)
+	content = control.StripReferencedContextPrefix(content)
+	return topicTitleFromText(content)
 }
 
 func topicTitleFromText(text string) string {
@@ -2986,6 +2994,11 @@ const (
 	defaultTopicTitle      = "新的会话"
 	topicTitleSourceAuto   = "auto"
 	topicTitleSourceManual = "manual"
+	// topicTitleSourceAutoSummary marks an auto title that has been upgraded to
+	// a flash-model summary of the opening exchange. It is auto-generated like
+	// "auto" but frozen: the truncation path treats it as non-auto so later
+	// saves and restarts do not clobber it, and it is summarized only once.
+	topicTitleSourceAutoSummary = "auto-summary"
 )
 
 func topicTitlesPath(workspaceRoot string) string {
@@ -3742,7 +3755,7 @@ func restoredSessionTopicTitle(dir, sessionPath string, meta agent.BranchMeta) s
 	if s, err := agent.LoadSession(sessionPath); err == nil {
 		for _, msg := range s.Messages {
 			if msg.Role == provider.RoleUser {
-				if title := topicTitleFromText(control.StripComposePrefixes(agent.HandoffTask(msg.Content))); title != "" {
+				if title := topicTitleFromUserContent(msg.Content); title != "" {
 					return title
 				}
 			}
@@ -4315,8 +4328,9 @@ func (a *App) topicTrashTargets(topicID string) ([]topicTrashTarget, error) {
 // topicSummary is used by ListProjectTree and mergeSessionInfos to track
 // per-topic turn count and last activity.
 type topicSummary struct {
-	turns          int
-	lastActivityAt int64
+	turns             int
+	lastActivityAt    int64
+	latestSessionPath string
 }
 
 var listProjectTreeMu sync.Mutex
@@ -4494,6 +4508,7 @@ func (a *App) ListProjectTree() []ProjectNode {
 
 	// Global section.
 	globalTitleMap := loadTopicTitles("")
+	globalSourceMap := loadTopicTitleSources("")
 	globalCreatedMap := loadTopicCreatedAts("")
 	if len(globalTitleMap) > 0 || len(f.Projects) == 0 {
 		globalTitle := strings.TrimSpace(f.GlobalTitle)
@@ -4504,8 +4519,8 @@ func (a *App) ListProjectTree() []ProjectNode {
 		globalTopicIDs := pinnedTopicIDs(orderedTopicIDs(f.GlobalTopics, globalTitleMap), f.GlobalPinnedTopics)
 		children := make([]ProjectNode, 0, len(globalTopicIDs))
 		for _, id := range globalTopicIDs {
-			title := globalTitleMap[id]
 			summary := topicSummaries[topicSummaryKey("global", "", id)]
+			title := repairLeakedAutoTopicTitle("", id, globalTitleMap[id], globalSourceMap[id], summary)
 			open, running, status := topicRuntimeStatus(topicSummaryKey("global", "", id))
 			pinned := containsDesktopString(f.GlobalPinnedTopics, id)
 			children = append(children, ProjectNode{
@@ -4538,6 +4553,7 @@ func (a *App) ListProjectTree() []ProjectNode {
 	type projectTopics struct {
 		project    desktopProject
 		titles     map[string]string
+		sources    map[string]string
 		createdAts map[string]int64
 	}
 	projectTopicResults := make([]projectTopics, len(f.Projects))
@@ -4550,6 +4566,7 @@ func (a *App) ListProjectTree() []ProjectNode {
 			projectTopicResults[i] = projectTopics{
 				project:    p,
 				titles:     loadTopicTitles(p.Root),
+				sources:    loadTopicTitleSources(p.Root),
 				createdAts: loadTopicCreatedAts(p.Root),
 			}
 		}()
@@ -4576,10 +4593,11 @@ func (a *App) ListProjectTree() []ProjectNode {
 		children := make([]ProjectNode, 0, len(topicIDs))
 		for _, tid := range topicIDs {
 			topicTitle := strings.TrimSpace(titleMap[tid])
+			summary := topicSummaries[topicSummaryKey("project", p.Root, tid)]
+			topicTitle = repairLeakedAutoTopicTitle(p.Root, tid, topicTitle, loaded.sources[tid], summary)
 			if topicTitle == "" {
 				topicTitle = defaultTopicTitle
 			}
-			summary := topicSummaries[topicSummaryKey("project", p.Root, tid)]
 			open, running, status := topicRuntimeStatus(topicSummaryKey("project", p.Root, tid))
 			pinned := containsDesktopString(p.PinnedTopics, tid)
 			children = append(children, ProjectNode{
@@ -4641,6 +4659,29 @@ func runtimeSessionTreeLabel(tab *WorkspaceTab, info agent.SessionInfo, title st
 		}
 	}
 	return defaultTopicTitle
+}
+
+func repairLeakedAutoTopicTitle(workspaceRoot, topicID, title, source string, summary topicSummary) string {
+	title = strings.TrimSpace(title)
+	if source != topicTitleSourceAuto || !topicTitleLooksLeakedMemoryCompiler(title) {
+		return title
+	}
+	sessionPath := strings.TrimSpace(summary.latestSessionPath)
+	if sessionPath == "" {
+		return title
+	}
+	nextTitle := topicTitleFromSession(sessionPath)
+	if nextTitle == "" || topicTitleLooksLeakedMemoryCompiler(nextTitle) || nextTitle == title {
+		return title
+	}
+	if err := setTopicTitleWithSource(workspaceRoot, topicID, nextTitle, topicTitleSourceAuto); err != nil {
+		return title
+	}
+	return nextTitle
+}
+
+func topicTitleLooksLeakedMemoryCompiler(title string) bool {
+	return strings.HasPrefix(strings.TrimSpace(title), "<memory-compiler")
 }
 
 func unixMilliOrZero(t time.Time) int64 {
@@ -5212,6 +5253,9 @@ func mergeSessionInfos(dir string, infos []agent.SessionInfo, titles map[string]
 		summary := topicSummaries[key]
 		summary.turns += info.Turns
 		lastActivityAt := info.LastActivityAt.UnixMilli()
+		if summary.latestSessionPath == "" || lastActivityAt > summary.lastActivityAt {
+			summary.latestSessionPath = info.Path
+		}
 		if lastActivityAt > summary.lastActivityAt {
 			summary.lastActivityAt = lastActivityAt
 		}

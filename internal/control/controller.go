@@ -3184,12 +3184,31 @@ func (c *Controller) emitRememberResult(r RememberResult) {
 		})
 		return
 	}
+	path := rememberConfigDisplayPath(r.Path)
 	switch {
 	case r.Saved:
-		c.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: fmt.Sprintf(i18n.M.PermissionSavedFmt, r.Path, r.Rule)})
+		c.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: fmt.Sprintf(i18n.M.PermissionSavedFmt, path, r.Rule)})
 	case strings.TrimSpace(r.CoveredBy) != "":
-		c.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: fmt.Sprintf(i18n.M.PermissionAlreadyAllowedFmt, r.Path, r.CoveredBy)})
+		c.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: fmt.Sprintf(i18n.M.PermissionAlreadyAllowedFmt, path, r.CoveredBy)})
 	}
+}
+
+func rememberConfigDisplayPath(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return i18n.M.UserConfigDisplayName
+	}
+	clean := filepath.Clean(trimmed)
+	base := filepath.Base(clean)
+	switch base {
+	case "reasonix.toml":
+		return i18n.M.ProjectConfigDisplayName
+	case "config.toml":
+		if strings.Contains(strings.ToLower(filepath.ToSlash(clean)), "reasonix") {
+			return i18n.M.UserConfigDisplayName
+		}
+	}
+	return trimmed
 }
 
 // detectProjectModules scans the workspace root for top-level source directories

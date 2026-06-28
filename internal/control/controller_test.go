@@ -17,6 +17,7 @@ import (
 	"reasonix/internal/command"
 	"reasonix/internal/event"
 	"reasonix/internal/hook"
+	"reasonix/internal/i18n"
 	"reasonix/internal/jobs"
 	"reasonix/internal/permission"
 	"reasonix/internal/plugin"
@@ -1176,7 +1177,10 @@ func TestApprovalPersistentBashPrefixRememberRule(t *testing.T) {
 	if remembered != "Bash(go test:*)" {
 		t.Fatalf("remembered rule = %q, want Bash(go test:*)", remembered)
 	}
-	if len(notices) != 1 || !strings.Contains(notices[0], "Bash(go test:*)") || !strings.Contains(notices[0], "reasonix.toml") {
+	if len(notices) != 1 ||
+		!strings.Contains(notices[0], "Bash(go test:*)") ||
+		!strings.Contains(notices[0], i18n.M.ProjectConfigDisplayName) ||
+		strings.Contains(notices[0], "reasonix.toml") {
 		t.Fatalf("notices = %v, want saved rule notice", notices)
 	}
 }

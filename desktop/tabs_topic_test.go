@@ -1390,6 +1390,74 @@ func TestAutoTitleTopicStripsReasoningLanguagePrefix(t *testing.T) {
 	}
 }
 
+func TestAutoTitleTopicUsesMemoryCompilerSourceEvent(t *testing.T) {
+	isolateDesktopUserDirs(t)
+
+	projectRoot := t.TempDir()
+	topic, err := NewApp().CreateTopic("project", projectRoot, "")
+	if err != nil {
+		t.Fatalf("create topic: %v", err)
+	}
+	prompt := `<memory-compiler-execution>
+{
+  "type": "memory_v5_execution_contract",
+  "planner_ir": {
+    "source_event": "继续修复左侧标题显示"
+  }
+}
+</memory-compiler-execution>`
+	sessionPath := filepath.Join(t.TempDir(), "session.jsonl")
+	if err := os.WriteFile(sessionPath, []byte(`{"role":"user","content":`+strconv.Quote(prompt)+`}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write session: %v", err)
+	}
+
+	title, updated := autoTitleTopicFromSession(projectRoot, topic.ID, sessionPath)
+	if !updated {
+		t.Fatal("auto title should update")
+	}
+	if title != "继续修复左侧标题显示" {
+		t.Fatalf("generated title = %q", title)
+	}
+}
+
+func TestListProjectTreeRepairsLeakedMemoryCompilerAutoTitle(t *testing.T) {
+	isolateDesktopUserDirs(t)
+
+	projectRoot := t.TempDir()
+	app := NewApp()
+	topic, err := app.CreateTopic("project", projectRoot, "")
+	if err != nil {
+		t.Fatalf("create topic: %v", err)
+	}
+	if err := setTopicTitleWithSource(projectRoot, topic.ID, "<memory-compiler-…", topicTitleSourceAuto); err != nil {
+		t.Fatalf("set leaked title: %v", err)
+	}
+	prompt := `<memory-compiler-execution>
+{
+  "type": "memory_v5_execution_contract",
+  "planner_ir": {
+    "source_event": "继续修复左侧标题显示"
+  }
+}
+</memory-compiler-execution>`
+	sessionDir := desktopSessionDir(projectRoot)
+	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
+		t.Fatalf("mkdir session dir: %v", err)
+	}
+	writeTopicSessionWithPrompt(t, sessionDir, "session.jsonl", topic.ID, "<memory-compiler-…", projectRoot, prompt, time.Now())
+
+	nodes := app.ListProjectTree()
+	if len(nodes) != 1 || len(nodes[0].Children) != 1 {
+		t.Fatalf("project tree = %#v, want one project with one topic", nodes)
+	}
+	if got := nodes[0].Children[0].Label; got != "继续修复左侧标题显示" {
+		t.Fatalf("tree title = %q", got)
+	}
+	if got := loadTopicTitle(projectRoot, topic.ID); got != "继续修复左侧标题显示" {
+		t.Fatalf("stored title = %q", got)
+	}
+}
+
 func TestAutoTitleDoesNotOverrideManualTopicTitle(t *testing.T) {
 	isolateDesktopUserDirs(t)
 

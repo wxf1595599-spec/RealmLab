@@ -40,6 +40,7 @@
 # so the desktop app resolves the same config/keys the CLI does). Never commit.
 /reasonix.toml
 /.env
+/.local-app/
 
 # `go build` binary produced in-tree (module reasonix/desktop → "desktop")
 /desktop

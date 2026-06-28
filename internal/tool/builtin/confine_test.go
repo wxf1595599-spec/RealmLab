@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"reasonix/internal/config"
@@ -51,6 +52,24 @@ func TestConfineInsideAndOutside(t *testing.T) {
 	}
 	if err := confine(roots, filepath.Join(filepath.Dir(root), "neighbour", "x")); err == nil {
 		t.Error("sibling path accepted, want error")
+	}
+}
+
+func TestConfineErrorUsesProductNeutralConfigHint(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "out.txt")
+	err := confine(realRoots([]string{root}), outside)
+	if err == nil {
+		t.Fatal("outside write should be denied")
+	}
+	msg := err.Error()
+	for _, oldName := range []string{"reasonix.toml", "~/.reasonix"} {
+		if strings.Contains(msg, oldName) {
+			t.Fatalf("confinement error should not expose legacy config name %q:\n%s", oldName, msg)
+		}
+	}
+	if !strings.Contains(msg, "RealmLab project/user config") {
+		t.Fatalf("confinement error should point to RealmLab config wording:\n%s", msg)
 	}
 }
 

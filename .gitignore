@@ -6,6 +6,10 @@
 /reasonix
 /reasonix.exe
 
+# Local visual QA scratch files
+/_r3_*.html
+/_r3_*.png
+
 # Website (Astro) build output
 /site/dist/
 /site/.astro/

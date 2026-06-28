@@ -1,5 +1,6 @@
-/* Reasonix marketing site — Google-style visual language:
-   pure white, one blue accent, soft-gray surfaces, large radii, pill buttons. */
+/* RealmLab-compatible upstream marketing surface:
+   kept separate from the desktop product UI. Do not use this Google-style
+   landing-page language as a source for RealmLab IDE workbench styling. */
 @import '@fontsource-variable/outfit';
 @import '@fontsource-variable/jetbrains-mono';
 

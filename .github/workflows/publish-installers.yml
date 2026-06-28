@@ -1,0 +1,166 @@
+name: Publish installers
+
+on:
+  push:
+    tags:
+      - "realmlab-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, for example 0.1.0"
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-installers-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-universal
+            runner: macos-14
+            platform: darwin/universal
+          - name: windows-amd64
+            runner: windows-latest
+            platform: windows/amd64
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: desktop/go.mod
+          cache: true
+          cache-dependency-path: desktop/go.sum
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+
+      - name: Install Windows packaging dependencies
+        if: runner.os == 'Windows'
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> "$GITHUB_PATH"
+
+      - name: Install macOS packaging dependencies
+        if: runner.os == 'macOS'
+        run: brew install create-dmg
+
+      - name: Install Wails CLI
+        run: |
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+
+      - name: UI parity gate
+        run: |
+          corepack pnpm --dir desktop/frontend install --frozen-lockfile
+          corepack pnpm --dir desktop/frontend build
+          corepack pnpm --dir desktop/frontend exec tsx src/__tests__/realmlab-design-contract.test.ts
+          corepack pnpm --dir desktop/frontend exec tsx src/__tests__/context-panel-breakdown.test.ts
+          corepack pnpm --dir desktop/frontend exec tsx src/__tests__/app-chrome-tabs.test.ts
+
+      - name: Resolve release version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#realmlab-}"
+          else
+            version="v${{ inputs.version }}"
+            tag="realmlab-${version}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Resolved ${tag} (${version})"
+
+      - name: Build and package installer
+        run: scripts/desktop-build.sh "${{ matrix.platform }}" "${{ steps.version.outputs.version }}" stable
+
+      - name: Verify macOS artifacts
+        if: runner.os == 'macOS'
+        run: |
+          test -s dist/RealmLab-darwin-universal.dmg
+          test -s dist/RealmLab-darwin-arm64.zip
+          test -s dist/RealmLab-darwin-amd64.zip
+          ls -lh dist
+
+      - name: Verify Windows artifacts
+        if: runner.os == 'Windows'
+        run: |
+          test -s dist/RealmLab-windows-amd64-installer.exe
+          test -s dist/RealmLab-windows-amd64.zip
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installers-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: installers-*
+          merge-multiple: true
+
+      - name: Resolve release version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#realmlab-}"
+          else
+            version="v${{ inputs.version }}"
+            tag="realmlab-${version}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          notes="$(mktemp)"
+          cat > "$notes" <<EOF
+          RealmLab desktop ${VERSION}
+
+          Installers in this release:
+          - macOS: RealmLab-darwin-universal.dmg
+          - Windows: RealmLab-windows-amd64-installer.exe
+
+          UI parity gate:
+          - Both macOS and Windows builds are produced from the same commit.
+          - Both runners execute the same frontend build and design-contract tests before packaging.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "RealmLab ${VERSION}" --notes-file "$notes"
+          fi

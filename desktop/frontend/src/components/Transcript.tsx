@@ -90,6 +90,7 @@ export function Transcript({
   running = false,
   questionNavigator = true,
   welcomeVariant = "default",
+  studentMode = false,
   creationMode = false,
   actionHoverMenus = false,
   rewindSignal = 0,
@@ -109,6 +110,7 @@ export function Transcript({
   running?: boolean;
   questionNavigator?: boolean;
   welcomeVariant?: "default" | "creation";
+  studentMode?: boolean;
   creationMode?: boolean;
   actionHoverMenus?: boolean;
   rewindSignal?: number;
@@ -602,7 +604,7 @@ export function Transcript({
         ref={scrollRef}
         onScroll={onScroll}
       >
-        {empty && !hydrating && <Welcome onPrompt={onPrompt} variant={welcomeVariant} />}
+        {empty && !hydrating && <Welcome onPrompt={onPrompt} variant={welcomeVariant} studentMode={studentMode} />}
 
         <LiveStreamContext.Provider value={live}>
           {turnGroups.length > HOT_TURNS && (

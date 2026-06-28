@@ -296,6 +296,7 @@ console.log("\ncomposer voice input");
 
   const recognition = FakeSpeechRecognition.instances[0];
   ok(Boolean(recognition?.started), "clicking voice input starts recognition");
+  ok(Boolean(document.querySelector(".composer-voice__status")), "speech voice input shows a recording status");
 
   if (recognition) {
     await act(async () => {
@@ -335,6 +336,9 @@ console.log("\ncomposer voice input");
 
   ok(Boolean(FakeMediaRecorder.instances[0]?.state === "recording"), "native voice input starts a media recorder");
   eq(voiceButton?.getAttribute("aria-pressed"), "true", "native voice input shows recording state");
+  const voiceStatus = document.querySelector(".composer-voice__status");
+  ok(Boolean(voiceStatus), "native voice input shows a recording status");
+  ok(voiceStatus?.textContent?.includes("Listening") ?? false, "native voice input recording status has a clear label");
 
   await act(async () => {
     voiceButton?.click();
@@ -347,6 +351,7 @@ console.log("\ncomposer voice input");
   ok(String((transcribeCalls[0] as { dataUrl?: string })?.dataUrl ?? "").startsWith("data:audio/"), "native voice input sends an audio data URL");
   eq(textarea?.value, "后端转写文本", "backend transcript is inserted into the composer");
   eq(voiceButton?.getAttribute("aria-pressed"), "false", "native voice input exits recording state after transcription");
+  eq(document.querySelector(".composer-voice__status"), null, "native voice input clears recording status after transcription");
 
   await act(async () => {
     root.unmount();

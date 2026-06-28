@@ -804,3 +804,23 @@ func TestRenderTOMLDefaultStepsDoNotOverrideGlobalConfig(t *testing.T) {
 		t.Errorf("after project: max_steps = %d, want 100 (global should not be overridden by commented-out default)", cfg.Agent.MaxSteps)
 	}
 }
+
+func TestRenderTOMLUsesProductNeutralProjectConfigHints(t *testing.T) {
+	body := RenderTOML(Default())
+	for _, unwanted := range []string{
+		"./reasonix.toml",
+		"not overridden by ./reasonix.toml",
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("rendered user config should avoid old project filename hint %q:\n%s", unwanted, body)
+		}
+	}
+	for _, want := range []string{
+		"Resolution order: flag > project config file >",
+		"Fields marked user/global only are not overridden by project config files.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("rendered user config missing product-neutral hint %q:\n%s", want, body)
+		}
+	}
+}

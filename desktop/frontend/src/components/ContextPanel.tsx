@@ -326,38 +326,42 @@ export function ContextPanel({
         <section className="context-panel__overview">
           <section className="context-panel__usage">
             <SectionHeading title={t("context.windowTitle")} meta={t("context.windowSubtitle")} />
-            <div className="context-panel__usage-visual">
-              <div className="context-panel__donut" style={donutStyle}>
-                <div className="context-panel__donut-core">
-                  <strong>{fmtTokens(usedTokens)}</strong>
-                  <span>/ {fmtTokens(windowTokens)} tokens</span>
+            <div className="context-panel__usage-grid">
+              <div className="context-panel__usage-visual">
+                <div className="context-panel__donut" style={donutStyle}>
+                  <div className="context-panel__donut-core">
+                    <strong>{fmtTokens(usedTokens)}</strong>
+                    <span>/ {fmtTokens(windowTokens)} tokens</span>
+                  </div>
                 </div>
+                <div className="context-panel__percent">{usagePct}%</div>
               </div>
-              <div className="context-panel__percent">{usagePct}%</div>
-            </div>
-            <div className="context-panel__usage-progress" aria-label={t("context.windowSubtitle")}>
-              <div className="context-panel__progress-head">
-                <strong>{fmtTokens(usedTokens)} / {fmtTokens(windowTokens)}</strong>
-                <span>{usagePct}%</span>
-              </div>
-              <div className="context-panel__progress-track" aria-hidden="true">
-                <span className="context-panel__progress-fill" style={{ width: `${usagePct}%` }} />
-              </div>
-            </div>
-            <div className="context-panel__summary-rows">
-              <MiniStat label={t("status.compactLabel")} value={compactPct > 0 ? `${compactPct}%` : "-"} />
-              <MiniStat label={t("status.cacheAvgLabel")} value={fmtSessionCacheRate(usage)} />
-              <MiniStat label={t("context.sessionCost")} value={sessionCostLabel} />
-              <MiniStat label={t("status.sessionTurnsLabel")} value={fmtTurns(sessionTurns, t)} />
-            </div>
-            <div className="context-panel__breakdown">
-              <TokenLegend label={t("context.prompt")} value={breakdown.promptTokens} color="prompt" />
-              <TokenLegend label={t("context.completion")} value={breakdown.completionTokens} color="completion" />
-              <TokenLegend label={t("context.reasoning")} value={breakdown.reasoningTokens} color="reasoning" />
-              <TokenLegend label={t("context.other")} value={breakdown.otherTokens} color="other" />
-              <div className="context-panel__total">
-                <span>{t("context.total")}</span>
-                <strong>{usedTokens.toLocaleString()} / {windowTokens.toLocaleString()}</strong>
+              <div className="context-panel__usage-detail">
+                <div className="context-panel__usage-progress" aria-label={t("context.windowSubtitle")}>
+                  <div className="context-panel__progress-head">
+                    <strong>{fmtTokens(usedTokens)} / {fmtTokens(windowTokens)}</strong>
+                    <span>{usagePct}%</span>
+                  </div>
+                  <div className="context-panel__progress-track" aria-hidden="true">
+                    <span className="context-panel__progress-fill" style={{ width: `${usagePct}%` }} />
+                  </div>
+                </div>
+                <div className="context-panel__summary-rows">
+                  <MiniStat label={t("status.compactLabel")} value={compactPct > 0 ? `${compactPct}%` : "-"} />
+                  <MiniStat label={t("status.cacheAvgLabel")} value={fmtSessionCacheRate(usage)} />
+                  <MiniStat label={t("context.sessionCost")} value={sessionCostLabel} />
+                  <MiniStat label={t("status.sessionTurnsLabel")} value={fmtTurns(sessionTurns, t)} />
+                </div>
+                <div className="context-panel__breakdown">
+                  <TokenLegend label={t("context.prompt")} value={breakdown.promptTokens} color="prompt" />
+                  <TokenLegend label={t("context.completion")} value={breakdown.completionTokens} color="completion" />
+                  <TokenLegend label={t("context.reasoning")} value={breakdown.reasoningTokens} color="reasoning" />
+                  <TokenLegend label={t("context.other")} value={breakdown.otherTokens} color="other" />
+                  <div className="context-panel__total">
+                    <span>{t("context.total")}</span>
+                    <strong>{usedTokens.toLocaleString()} / {windowTokens.toLocaleString()}</strong>
+                  </div>
+                </div>
               </div>
             </div>
           </section>

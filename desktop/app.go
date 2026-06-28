@@ -146,6 +146,11 @@ type App struct {
 	skillRootsCache skillRootsCache
 
 	heartbeat *HeartbeatEngine // scheduled heartbeat tasks; nil until startup
+
+	// titleSumMu guards titleSumInflight: per-topic keys with a session-title
+	// summary call in flight, so concurrent saves don't fire duplicate requests.
+	titleSumMu       sync.Mutex
+	titleSumInflight map[string]bool
 }
 
 type skillRootsCache struct {

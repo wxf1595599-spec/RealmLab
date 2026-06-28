@@ -148,6 +148,7 @@ import { useGlobalShortcut } from "./lib/keyboardShortcuts";
 import { topicShortcutIndexFromEvent, useTopicShortcuts, type TopicShortcutEntry } from "./lib/topicShortcuts";
 import { composerDraftKeyForTab } from "./lib/composerDraftKey";
 import logoWordmark from "./assets/logo-wordmark.svg";
+import logoWordmarkStudentSidebar from "./assets/logo-wordmark-student-sidebar.svg";
 
 const HistoryPanel = lazy(() => import("./components/HistoryPanel").then((module) => ({ default: module.HistoryPanel })));
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then((module) => ({ default: module.SettingsPanel })));
@@ -1338,8 +1339,23 @@ export default function App() {
     if (!studentModeEnabled) return;
     if (toolApprovalMode === "auto") applyToolApprovalMode("ask");
   }, [applyToolApprovalMode, studentModeEnabled, toolApprovalMode]);
+  const studentModeSwitchBlocked =
+    studentModeSyncing ||
+    state.running ||
+    state.approval != null ||
+    state.ask != null ||
+    state.messageAction != null;
+  const studentModeTooltipLabel =
+    studentModeSwitchBlocked && !studentModeSyncing
+      ? t("common.busyHint")
+      : studentModeEnabled
+        ? t("topicBar.studentModeOn")
+        : t("topicBar.studentMode");
   const toggleStudentMode = useCallback(async () => {
-    if (studentModeSyncing) return;
+    if (studentModeSwitchBlocked) {
+      if (!studentModeSyncing) showToast(t("common.busyHint"), "warn");
+      return;
+    }
     const nextEnabled = !studentModeEnabled;
     setStudentModeEnabled(nextEnabled);
     setStudentModeSyncing(true);
@@ -1355,7 +1371,7 @@ export default function App() {
     } finally {
       setStudentModeSyncing(false);
     }
-  }, [controllerReady, showToast, studentModeEnabled, studentModeSyncing, t]);
+  }, [controllerReady, showToast, studentModeEnabled, studentModeSwitchBlocked, studentModeSyncing, t]);
   useEffect(() => {
     if (!activeTabId || !controllerReady) return;
     void app.SetStudentMode(studentModeEnabled).catch((error) => {
@@ -2719,7 +2735,8 @@ export default function App() {
             <>
               <div className="sidebar__head" aria-hidden={sidebarCollapsed}>
                 <div className="sidebar__brand sidebar__brand--workbench">
-                  <img src={logoWordmark} alt="MicroRealm Lab" className="sidebar__brand-logo sidebar__brand-logo--workbench" draggable={false} />
+                  <img src={logoWordmark} alt="MicroRealm Lab" className="sidebar__brand-logo sidebar__brand-logo--workbench sidebar__brand-logo--default" draggable={false} />
+                  <img src={logoWordmarkStudentSidebar} alt="MicroRealm Lab" className="sidebar__brand-logo sidebar__brand-logo--workbench sidebar__brand-logo--student-side" draggable={false} />
                 </div>
               </div>
 
@@ -2739,7 +2756,8 @@ export default function App() {
           ) : (
             <>
               <div className="sidebar__brand" aria-hidden={sidebarCollapsed}>
-                <img src={logoWordmark} alt="MicroRealm Lab" className="sidebar__brand-logo" draggable={false} />
+                <img src={logoWordmark} alt="MicroRealm Lab" className="sidebar__brand-logo sidebar__brand-logo--default" draggable={false} />
+                <img src={logoWordmarkStudentSidebar} alt="MicroRealm Lab" className="sidebar__brand-logo sidebar__brand-logo--student-side" draggable={false} />
               </div>
 
               <button
@@ -3062,7 +3080,7 @@ export default function App() {
             </div>
             <div className="topicbar__spacer" />
             <div className="topicbar__actions">
-              <Tooltip label={studentModeEnabled ? t("topicBar.studentModeOn") : t("topicBar.studentMode")}>
+              <Tooltip label={studentModeTooltipLabel}>
                 <button
                   className={[
                     "topicbar__action-btn",
@@ -3073,7 +3091,7 @@ export default function App() {
                   type="button"
                   aria-label={studentModeEnabled ? t("topicBar.studentModeOn") : t("topicBar.studentMode")}
                   aria-pressed={studentModeEnabled}
-                  disabled={studentModeSyncing}
+                  disabled={studentModeSwitchBlocked}
                   onClick={() => void toggleStudentMode()}
                 >
                   <GraduationCap size={15} />
@@ -3237,6 +3255,7 @@ export default function App() {
                 rewindDisabled={Boolean(activeTab?.readOnly) || !controllerReady || hydratePlaceholderActive || rewindState != null || rewindCommitting || state.running || state.messageAction != null || state.approval != null || state.ask != null || clearContextPending}
                 running={state.running || rewindCommitting}
                 welcomeVariant={sidebarCreation ? "creation" : "default"}
+                studentMode={studentModeEnabled}
                 creationMode={sidebarCreation}
                 actionHoverMenus={sidebarCreation && !hydratePlaceholderActive}
                 rewindSignal={rewindSignal}

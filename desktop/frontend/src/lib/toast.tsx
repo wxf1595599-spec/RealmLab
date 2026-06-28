@@ -21,23 +21,45 @@ let nextId = 1;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastsRef = useRef<Toast[]>([]);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
 
-  const showToast = useCallback((text: string, level: Toast["level"] = "info") => {
-    const id = nextId++;
-    setToasts((prev) => [...prev, { id, text, level }]);
+  const scheduleDismiss = useCallback((id: number) => {
+    const previous = timers.current.get(id);
+    if (previous) clearTimeout(previous);
     const timer = setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
+      setToasts((prev) => {
+        const next = prev.filter((t) => t.id !== id);
+        toastsRef.current = next;
+        return next;
+      });
       timers.current.delete(id);
     }, 2500);
     timers.current.set(id, timer);
   }, []);
 
+  const showToast = useCallback((text: string, level: Toast["level"] = "info") => {
+    const existing = toastsRef.current.find((toast) => toast.text === text && toast.level === level);
+    if (existing) {
+      scheduleDismiss(existing.id);
+      return;
+    }
+    const id = nextId++;
+    const next = [...toastsRef.current, { id, text, level }];
+    toastsRef.current = next;
+    setToasts(next);
+    scheduleDismiss(id);
+  }, [scheduleDismiss]);
+
   const dismissToast = useCallback((id: number) => {
     const timer = timers.current.get(id);
     if (timer) clearTimeout(timer);
     timers.current.delete(id);
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      toastsRef.current = next;
+      return next;
+    });
   }, []);
 
   return (

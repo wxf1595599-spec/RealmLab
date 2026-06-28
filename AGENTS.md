@@ -12,6 +12,7 @@ RealmLab 是 `esengine/DeepSeek-Reasonix` 的长期产品 fork。目标是持续
 - 桌面端品牌是 `RealmLab IDE` 和 `MicroRealm Lab`。
 - 不要把上游 `Reasonix` 作为用户可见产品名、助手名、标题或默认称呼。
 - Web/site/worker 目录为上游兼容而保留，不是当前产品体验重心。
+- RealmLab 官网工作必须先遵守 `docs/REALMLAB_SITE_BRIEF.md`，不要把上游 Reasonix marketing site 视觉或 CSS 反向带入桌面端。
 
 ## Required Reads Before Meaningful Changes
 
@@ -27,6 +28,10 @@ RealmLab 是 `esengine/DeepSeek-Reasonix` 的长期产品 fork。目标是持续
 - `desktop/frontend/src/lib/theme.ts`
 - `desktop/frontend/src/styles.css` 中相关区域
 
+如果涉及 `site/`、`workers/`、官网文案或上游 marketing surface，还要阅读：
+
+- `docs/REALMLAB_SITE_BRIEF.md`
+
 ## Protected RealmLab Decisions
 
 以下是产品定制，不得在上游合并或普通改动中丢失：
@@ -39,6 +44,7 @@ RealmLab 是 `esengine/DeepSeek-Reasonix` 的长期产品 fork。目标是持续
 - App icon 使用当前圆弧角黑底图标。
 - 用户可见权限模式文案使用 `Soha`，不要显示 `Yolo` 或 `YOLO`。
 - `internal/config.RealmLabIdentityPolicy` 必须保留，并继续约束模型输出品牌名。
+- 桌面语音输入必须优先走 RealmLab 自己的录音 + 后端转写链路；Web Speech 只能作为 fallback，不能作为 Windows/macOS/Linux 可用性的唯一依据。
 - Go module path 和部分内部 legacy key 可以继续叫 `reasonix`，除非有专门迁移计划。
 
 ## Upstream Sync Rules
@@ -195,4 +201,3 @@ go test ./...
 ## Current Known Local Build Quirk
 
 macOS 本地 Wails build 可能输出 `codesign failed`，但这通常发生在 `.app` 已经完成 packaging 后。不要直接判断构建完全失败。先检查 `desktop/build/bin/realmlab-desktop.app` 是否存在，再按本文件的 clean signing 流程恢复。
-

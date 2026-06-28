@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Check, Eye, FileText, Folder, Gauge, List, MessageSquare, Mic, MoreHorizontal, Search, Shield, ShieldAlert, ShieldCheck, SlidersHorizontal, Square, Target, Trash2, X } from "lucide-react";
+import { ArrowUp, Eye, FileText, Folder, Gauge, List, MessageSquare, Mic, Search, Shield, ShieldAlert, ShieldCheck, SlidersHorizontal, Square, Target, Trash2, X } from "lucide-react";
 import { asArray } from "../lib/array";
 import { filterAtMatches } from "../lib/atMatches";
 import { DedupIndex, sha256 } from "../lib/attachDedup";
@@ -24,6 +24,7 @@ import { ArgMenu } from "./ArgMenu";
 import { VirtualMenu } from "./VirtualMenu";
 import { ANCHORED_POPOVER_CLOSE_MS, AnchoredPopover } from "./AnchoredPopover";
 import { EffortSwitcher } from "./EffortSwitcher";
+import { EffortSlider } from "./EffortSlider";
 import { ModelSwitcher } from "./ModelSwitcher";
 import { Tooltip } from "./Tooltip";
 import { ComposerContextCard } from "./ComposerContextCard";
@@ -2183,10 +2184,9 @@ export function Composer({
     onSetEffort("auto");
   }, [currentEffort, hasEffort, onSetEffort, studentModeEnabled]);
   const chooseEffortLevel = (level: string) => {
-    closeMoreMenu(() => {
-      if (level !== currentEffort) onSetEffort(level);
-      requestAnimationFrame(() => taRef.current?.focus());
-    });
+    // Keep the popover open after picking so the slider stays put — at max the
+    // user can watch the particle animation; closing is via the trigger/outside/Esc.
+    if (level !== currentEffort) onSetEffort(level);
   };
   const runActivity = retry
     ? t("status.retrying", { attempt: retry.attempt, max: retry.max })
@@ -2281,24 +2281,7 @@ export function Composer({
       >
         {hasEffort && !studentModeEnabled && (
           <div className="composer-access-menu__section">
-            <div className="composer-access-menu__label">{t("status.effortTitle")}</div>
-            <div className="composer-more-menu__items" role="listbox" aria-label={t("status.effortTitle")}>
-              {effortLevels.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  role="option"
-                  aria-selected={level === currentEffort}
-                  className={`composer-more-menu__item${level === currentEffort ? " composer-more-menu__item--active" : ""}`}
-                  onClick={() => chooseEffortLevel(level)}
-                  disabled={running}
-                >
-                  <Gauge size={14} />
-                  <span>{level}</span>
-                  {level === currentEffort && <Check size={13} />}
-                </button>
-              ))}
-            </div>
+            <EffortSlider effort={effort} onPick={chooseEffortLevel} disabled={running} title={t("status.effortTitle")} />
           </div>
         )}
       </AnchoredPopover>
@@ -2605,19 +2588,31 @@ export function Composer({
           )}
           <div className="composer__actions">
             {(voiceVisible || voiceListening) && (
-              <Tooltip label={voiceListening ? t("composer.voiceStop") : voiceSupported ? t("composer.voiceInput") : t("composer.voiceUnsupported")}>
-                <button
-                  type="button"
-                  className={`composer__btn composer__btn--voice${voiceListening ? " composer__btn--voice-active" : ""}`}
-                  onClick={toggleVoiceInput}
-                  disabled={disabled || readOnly || running}
-                  aria-label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}
-                  aria-pressed={voiceListening}
-                  title={voiceSupported ? undefined : t("composer.voiceUnsupported")}
-                >
-                  <Mic size={16} />
-                </button>
-              </Tooltip>
+              <div className={`composer-voice${voiceListening ? " composer-voice--listening" : ""}`}>
+                {voiceListening && (
+                  <span className="composer-voice__status" role="status" aria-live="polite">
+                    <span className="composer-voice__meter" aria-hidden="true">
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                    <span className="composer-voice__label">{t("composer.voiceListening")}</span>
+                  </span>
+                )}
+                <Tooltip label={voiceListening ? t("composer.voiceStop") : voiceSupported ? t("composer.voiceInput") : t("composer.voiceUnsupported")}>
+                  <button
+                    type="button"
+                    className={`composer__btn composer__btn--voice${voiceListening ? " composer__btn--voice-active" : ""}`}
+                    onClick={toggleVoiceInput}
+                    disabled={disabled || readOnly || running}
+                    aria-label={voiceListening ? t("composer.voiceStop") : t("composer.voiceInput")}
+                    aria-pressed={voiceListening}
+                    title={voiceSupported ? undefined : t("composer.voiceUnsupported")}
+                  >
+                    <Mic size={16} />
+                  </button>
+                </Tooltip>
+              </div>
             )}
             {!running && (
               <Tooltip label={t("composer.send")}>
@@ -2767,20 +2762,20 @@ export function Composer({
             )}
             {hasEffort && !studentModeEnabled && (
               <div className="composer-meta__control composer-meta__control--more">
-                <Tooltip label={t("composer.moreControls")} disabled={moreMenuOpen || moreMenuClosing}>
+                <Tooltip label={t("status.effortTitle")} disabled={moreMenuOpen || moreMenuClosing}>
                   <button
                     ref={moreMenuAnchorRef}
                     type="button"
-                    className={`composer-more-trigger${moreMenuOpen || moreMenuClosing ? " composer-more-trigger--open" : ""}`}
+                    className={`composer-more-trigger composer-more-trigger--effort${moreMenuOpen || moreMenuClosing ? " composer-more-trigger--open" : ""}`}
                     onClick={() => (moreMenuOpen || moreMenuClosing ? closeMoreMenu() : openMoreMenu())}
                     disabled={disabled || running}
                     aria-haspopup="menu"
                     aria-expanded={moreMenuOpen && !moreMenuClosing}
-                    aria-label={t("composer.moreControls")}
-                    title={moreMenuOpen || moreMenuClosing ? undefined : t("composer.moreControls")}
+                    aria-label={`${t("status.effortTitle")} ${currentEffort}`}
+                    title={moreMenuOpen || moreMenuClosing ? undefined : t("status.effortTitle")}
                   >
-                    <MoreHorizontal size={16} />
-                    <span>{t("topicBar.more")}</span>
+                    <Gauge size={14} />
+                    <span>{currentEffort}</span>
                   </button>
                 </Tooltip>
               </div>

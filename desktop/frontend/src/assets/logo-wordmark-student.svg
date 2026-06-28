@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 180" width="900" height="180" role="img" aria-label="MicroRealm">
+  <defs>
+    <linearGradient id="mr-student-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6fe0"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <path fill="#9cc1f5" d="M70 100 C73.64 116.24 81.76 124.36 98 128 C81.76 131.64 73.64 139.76 70 156 C66.36 139.76 58.24 131.64 42 128 C58.24 124.36 66.36 116.24 70 100Z"/>
+  <text x="450" y="165" text-anchor="middle" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="104" font-weight="700" letter-spacing="-1" fill="url(#mr-student-grad)" text-rendering="geometricPrecision">MicroRealm</text>
+  <path fill="url(#mr-student-grad)" d="M720 20 C723.64 36.24 731.76 44.36 748 48 C731.76 51.64 723.64 59.76 720 76 C716.36 59.76 708.24 51.64 692 48 C708.24 44.36 716.36 36.24 720 20Z"/>
+  <path fill="#9cc1f5" d="M830 100 C833.64 116.24 841.76 124.36 858 128 C841.76 131.64 833.64 139.76 830 156 C826.36 139.76 818.24 131.64 802 128 C818.24 124.36 826.36 116.24 830 100Z"/>
+</svg>
