@@ -32,6 +32,7 @@ import {
 import { getAvailableFontFamilies, getAvailableMonoFontFamilies } from "../lib/fontAvailability";
 import { getDisplayMode, onDisplayModeChange, setDisplayMode as setLocalDisplayMode } from "../lib/displayMode";
 import { DEFAULT_STATUS_BAR_ITEMS, normalizeStatusBarItems, type StatusBarItemId } from "../lib/statusBarItems";
+import { normalizeToolApprovalMode } from "../lib/types";
 import {
   comboFromKeyboardEvent,
   detectShortcutPlatform,
@@ -100,6 +101,8 @@ export function SettingsPanel({
     return nextTab === "providers" ? "models" : nextTab ?? "general";
   }, [studentModeEnabled]);
   const [s, setS] = useState<SettingsView | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -115,9 +118,19 @@ export function SettingsPanel({
   const { status, requestClose } = useDeferredClose(onClose, 240);
 
   const reload = useCallback(async () => {
-    const next = normalizeSettingsView(await app.Settings().catch(() => null));
-    setS(next);
-    return next;
+    setLoadingSettings(true);
+    setSettingsLoadFailed(false);
+    try {
+      const next = normalizeSettingsView(await app.Settings());
+      setS(next);
+      return next;
+    } catch {
+      setS(null);
+      setSettingsLoadFailed(true);
+      return null;
+    } finally {
+      setLoadingSettings(false);
+    }
   }, []);
   useEffect(() => {
     void reload();
@@ -200,10 +213,16 @@ export function SettingsPanel({
             ))}
           </nav>
           <main className="settings-center__content">
+            {needsSettings && settingsLoadFailed && (
+              <div className="banner banner--error settings-load-error" role="alert">
+                <span>{t("settings.loadFailed")}</span>
+                <button className="btn btn--small" type="button" onClick={() => void reload()}>{t("common.retry")}</button>
+              </div>
+            )}
             {needsSettings && err && <div className="banner banner--error">{err}</div>}
             {needsSettings && warning && <div className="banner banner--warning">{warning}</div>}
             {needsSettings && !s ? (
-              <div className="empty">{t("settings.loading")}</div>
+              loadingSettings ? <div className="empty">{t("settings.loading")}</div> : null
             ) : (
               <>
                 {tab === "general" && s && <SettingsPageShell key={tab} s={s} tab={tab} busy={busy} apply={apply}><GeneralSection s={s} busy={busy} apply={apply} agentRunning={agentRunning} /></SettingsPageShell>}
@@ -635,11 +654,11 @@ const REASONING_PROTOCOLS: readonly string[] = ["", "deepseek", "openai", "none"
 const PROXY_TYPES = ["http", "https", "socks5", "socks5h"] as const;
 const LANGUAGE_PREFS: LangPref[] = ["", "zh", "en"];
 const AUTO_PLAN_MODES = ["off", "on"] as const;
+const TOOL_APPROVAL_MODES = ["ask", "auto", "yolo"] as const;
 const BOT_TOOL_APPROVAL_MODES = ["", "ask", "auto", "yolo"] as const;
 
 type ProxyMode = (typeof PROXY_MODES)[number];
 type AutoPlanMode = (typeof AUTO_PLAN_MODES)[number];
-type BotConnectionToolApprovalMode = (typeof BOT_TOOL_APPROVAL_MODES)[number];
 
 function normalizeProxyMode(mode: string): ProxyMode {
   switch (mode) {
@@ -845,6 +864,7 @@ function normalizeSettingsView(view: SettingsView | null | undefined): SettingsV
     agent,
     bot: normalizeBotSettings(view.bot),
     autoPlan: normalizeAutoPlan(view.autoPlan),
+    defaultToolApprovalMode: normalizeToolApprovalMode(view.defaultToolApprovalMode),
     autoApproveTools: Boolean(view.autoApproveTools ?? view.bypass),
     bypass: Boolean(view.autoApproveTools ?? view.bypass),
     desktopLanguage: normalizeLangPref(view.desktopLanguage),
@@ -973,6 +993,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
   useEffect(() => onDisplayModeChange((mode) => setDisplayMode(mode)), []);
   useEffect(() => () => mouseDragCleanupRef.current?.(), []);
   const autoPlan = normalizeAutoPlan(s.autoPlan);
+  const defaultToolApprovalMode = normalizeToolApprovalMode(s.defaultToolApprovalMode);
   const memoryCompilerEnabled = s.memoryCompilerEnabled !== false;
   const languagePref = normalizeLangPref(s.desktopLanguage);
   const desktopLayoutStyle = normalizeDesktopLayoutStyle(s.desktopLayoutStyle);
@@ -1187,6 +1208,20 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               }}
             >
               {t(`settings.displayMode.${mode}`)}
+            </button>
+          ))}
+        </div>
+      </SettingsField>
+      <SettingsField label={t("settings.defaultToolApprovalMode")} hint={t("settings.defaultToolApprovalModeHint")}>
+        <div className="set-seg">
+          {TOOL_APPROVAL_MODES.map((mode) => (
+            <button
+              key={mode}
+              className={`set-seg__btn${defaultToolApprovalMode === mode ? " set-seg__btn--on" : ""}`}
+              disabled={busy}
+              onClick={() => void apply(() => app.SetDefaultToolApprovalMode(mode))}
+            >
+              {t(`settings.defaultToolApprovalMode.${mode}`)}
             </button>
           ))}
         </div>
@@ -1784,6 +1819,11 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
     setConnections((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
   const persistConnection = (id: string, patch: Partial<BotConnectionView>) =>
     persistConnections((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
+  const persistConnectionToolApprovalMode = (id: string, mode: string) => {
+    const normalizedMode = normalizeBotToolApprovalMode(mode, true);
+    setConnections((items) => items.map((item) => item.id === id ? { ...item, toolApprovalMode: normalizedMode } : item));
+    void apply(() => app.SetBotConnectionToolApprovalMode(id, normalizedMode));
+  };
   const updateConnectionCredential = (id: string, patch: Partial<BotConnectionView["credential"]>) =>
     setConnections((items) => items.map((item) => item.id === id ? { ...item, credential: { ...item.credential, ...patch } } : item));
   const persistConnectionCredential = (id: string, patch: Partial<BotConnectionView["credential"]>) =>
@@ -2601,7 +2641,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
                         type="button"
                         className={selectedConnectionToolApprovalMode === mode ? "provider-add-segmented__item provider-add-segmented__item--active" : "provider-add-segmented__item"}
                         disabled={busy}
-                        onClick={() => void persistConnection(selectedConnection.id, { toolApprovalMode: mode as BotConnectionToolApprovalMode })}
+                        onClick={() => persistConnectionToolApprovalMode(selectedConnection.id, mode)}
                       >
                         {t(`settings.botToolApprovalMode.${mode || "inherit"}` as DictKey)}
                       </button>
@@ -3086,7 +3126,10 @@ function ModelsSection({ s, busy, apply, backgroundApply }: ModelsSectionProps) 
       {subtab === "usage" ? (
         <>
           <SettingsSection title={studentModeEnabled ? t("settings.studentSection.currentModel") : t("settings.modelUsage")}>
-            <SettingsField label={studentModeEnabled ? t("settings.studentField.currentModel") : t("settings.defaultModel")}>
+            <SettingsField
+              label={studentModeEnabled ? t("settings.studentField.currentModel") : t("settings.defaultModel")}
+              hint={studentModeEnabled ? undefined : t("settings.defaultModelHint")}
+            >
               <ModelPicker
                 s={s}
                 refs={refs}

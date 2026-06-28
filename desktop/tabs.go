@@ -74,6 +74,13 @@ type WorkspaceTab struct {
 	usageTelemetry sessionUsageStats
 	telemMu        sync.Mutex
 
+	// plannerDisplay keeps display-only planner output for the in-flight turn.
+	// The executor session remains the model-facing transcript; this sidecar
+	// lets frontend history restore the planner cards after a rebuild/reload.
+	plannerDisplay      []HistoryMessage
+	plannerDisplayTools map[string]string
+	plannerDisplayMu    sync.Mutex
+
 	model            string // active model ref (for meta)
 	effort           *string
 	tokenMode        string
@@ -233,7 +240,7 @@ func (a *App) detachSessionRuntime(tab *WorkspaceTab) bool {
 		return false
 	}
 	if tab.sink != nil {
-		tab.sink.ctx = nil
+		tab.sink.clearContext()
 	}
 	a.mu.Lock()
 	a.ensureDetachedSessionsLocked()
@@ -293,7 +300,11 @@ func (a *App) detachRuntimeForReplacement(tab *WorkspaceTab) bool {
 	}
 	if detached.sink != nil {
 		detached.sink.tabID = detached.ID
-		detached.sink.ctx = nil
+		// clearContext (locked nil + drain the queued emitter), not a bare
+		// ctx=nil: the latter both data-races s.ctx and leaves already-queued
+		// events to flush onto the rebound tab after this session is backgrounded
+		// (#5352 — stale "AI 不断输出" on the now-visible session).
+		detached.sink.clearContext()
 	}
 
 	a.mu.Lock()
@@ -315,7 +326,7 @@ func applyRuntimeTab(target, source *WorkspaceTab, key string, wailsCtx context.
 	if source.sink != nil {
 		source.sink.tabID = target.ID
 		source.sink.app = app
-		source.sink.ctx = wailsCtx
+		source.sink.setContext(wailsCtx)
 	}
 
 	target.Ctrl = source.Ctrl
@@ -499,6 +510,145 @@ func (t *WorkspaceTab) resetTelemetry() {
 	t.telemMu.Unlock()
 }
 
+func (t *WorkspaceTab) resetPlannerDisplayTurn() {
+	t.plannerDisplayMu.Lock()
+	if len(t.plannerDisplay) == 0 {
+		t.plannerDisplayTools = nil
+	}
+	t.plannerDisplayMu.Unlock()
+}
+
+func (t *WorkspaceTab) recordPlannerDisplayEvent(e event.Event) {
+	if strings.TrimSpace(e.Source) != event.UsageSourcePlanner {
+		return
+	}
+	t.plannerDisplayMu.Lock()
+	defer t.plannerDisplayMu.Unlock()
+	switch e.Kind {
+	case event.Phase:
+		if strings.TrimSpace(e.Text) != "" {
+			t.plannerDisplay = append(t.plannerDisplay, HistoryMessage{Role: "phase", Content: e.Text})
+		}
+	case event.Reasoning:
+		if e.Text != "" {
+			hm := t.ensurePlannerAssistantLocked()
+			hm.Reasoning += e.Text
+		}
+	case event.Text:
+		if e.Text != "" {
+			hm := t.ensurePlannerAssistantLocked()
+			hm.Content += e.Text
+		}
+	case event.Message:
+		if e.Text != "" || e.Reasoning != "" || len(e.MemoryCitations) > 0 {
+			hm := t.ensurePlannerAssistantLocked()
+			if e.Text != "" {
+				hm.Content = e.Text
+			}
+			if e.Reasoning != "" {
+				hm.Reasoning = e.Reasoning
+			}
+			if len(e.MemoryCitations) > 0 {
+				hm.MemoryCitations = append([]provider.MemoryCitation(nil), e.MemoryCitations...)
+			}
+		}
+	case event.ToolDispatch:
+		if e.Tool.Partial || strings.TrimSpace(e.Tool.Name) == "" {
+			return
+		}
+		hm := t.ensurePlannerAssistantForToolLocked()
+		call := HistoryToolCall{
+			ID:        e.Tool.ID,
+			Name:      e.Tool.Name,
+			Arguments: e.Tool.Args,
+			Subject:   historyToolSubject(e.Tool.Name, e.Tool.Args),
+			Summary:   historyToolSummary(e.Tool.Name, e.Tool.Args, ""),
+			Diff:      e.Tool.Diff,
+			Added:     e.Tool.Added,
+			Removed:   e.Tool.Removed,
+		}
+		replaced := false
+		if call.ID != "" {
+			for i := range hm.ToolCalls {
+				if hm.ToolCalls[i].ID == call.ID {
+					hm.ToolCalls[i] = call
+					replaced = true
+					break
+				}
+			}
+			if t.plannerDisplayTools == nil {
+				t.plannerDisplayTools = map[string]string{}
+			}
+			t.plannerDisplayTools[call.ID] = call.Name
+		}
+		if !replaced {
+			hm.ToolCalls = append(hm.ToolCalls, call)
+		}
+	case event.ToolResult:
+		callID := strings.TrimSpace(e.Tool.ID)
+		content := firstNonEmpty(e.Tool.Output, e.Tool.Err)
+		display, errPreview := plannerToolResultDisplay(content, e.Tool.Err != "")
+		if callID != "" {
+			updateHistoryToolCallSummary(t.plannerDisplay, callID, content)
+		}
+		toolName := e.Tool.Name
+		if toolName == "" && t.plannerDisplayTools != nil {
+			toolName = t.plannerDisplayTools[callID]
+		}
+		t.plannerDisplay = append(t.plannerDisplay, HistoryMessage{
+			Role:            "tool",
+			ToolCallID:      callID,
+			ToolName:        toolName,
+			Content:         display,
+			ToolResultError: errPreview,
+		})
+	case event.Notice:
+		if strings.TrimSpace(e.Text) != "" {
+			level := "info"
+			if e.Level == event.LevelWarn {
+				level = "warn"
+			}
+			t.plannerDisplay = append(t.plannerDisplay, HistoryMessage{Role: "notice", Level: level, Content: e.Text})
+		}
+	}
+}
+
+func (t *WorkspaceTab) ensurePlannerAssistantLocked() *HistoryMessage {
+	if n := len(t.plannerDisplay); n > 0 && t.plannerDisplay[n-1].Role == "assistant" {
+		return &t.plannerDisplay[n-1]
+	}
+	t.plannerDisplay = append(t.plannerDisplay, HistoryMessage{Role: "assistant"})
+	return &t.plannerDisplay[len(t.plannerDisplay)-1]
+}
+
+func (t *WorkspaceTab) ensurePlannerAssistantForToolLocked() *HistoryMessage {
+	if n := len(t.plannerDisplay); n > 0 && t.plannerDisplay[n-1].Role == "assistant" && strings.TrimSpace(t.plannerDisplay[n-1].Content) == "" {
+		return &t.plannerDisplay[n-1]
+	}
+	t.plannerDisplay = append(t.plannerDisplay, HistoryMessage{Role: "assistant"})
+	return &t.plannerDisplay[len(t.plannerDisplay)-1]
+}
+
+func plannerToolResultDisplay(content string, failed bool) (display, errPreview string) {
+	if strings.TrimSpace(content) == "" {
+		return "", ""
+	}
+	if failed || historyToolResultFailed(content) {
+		display = clipHistoryToolPreview(strings.TrimSpace(content))
+		return display, display
+	}
+	return "", ""
+}
+
+func (t *WorkspaceTab) takePlannerDisplayTurn() []HistoryMessage {
+	t.plannerDisplayMu.Lock()
+	defer t.plannerDisplayMu.Unlock()
+	out := cloneHistoryMessages(t.plannerDisplay)
+	t.plannerDisplay = nil
+	t.plannerDisplayTools = nil
+	return out
+}
+
 // tabEventSink wraps a parent event.Sink and prepends a tabId to every wire
 // event so the frontend can route it to the correct tab's reducer.
 type tabEventSink struct {
@@ -513,6 +663,7 @@ func (s *tabEventSink) Emit(e event.Event) {
 	if s.app != nil {
 		switch e.Kind {
 		case event.TurnStarted:
+			s.resetPlannerDisplayTurn()
 			s.recordTurnStarted()
 		case event.Usage:
 			s.recordUsageTelemetry(e)
@@ -524,6 +675,9 @@ func (s *tabEventSink) Emit(e event.Event) {
 			if e.Kind == event.TurnDone {
 				m.persist()
 			}
+		}
+		if e.Kind == event.TurnDone {
+			s.flushPlannerDisplay()
 		}
 	}
 	s.emitRuntimeEvent(eventChannel, toWireTab(e, s.tabID))
@@ -538,6 +692,9 @@ func (s *tabEventSink) Emit(e event.Event) {
 	// Record read_file successes in the tab's telemetry.
 	if e.Kind == event.ToolResult && e.Tool.Name == "read_file" && e.Tool.Err == "" {
 		s.recordReadTelemetry(e)
+	}
+	if s.app != nil {
+		s.recordPlannerDisplay(e)
 	}
 	// Persist after each turn so a force-kill loses at most the in-flight prompt.
 	if e.Kind == event.TurnDone && s.app != nil {
@@ -782,6 +939,62 @@ func (s *tabEventSink) recordUsageTelemetry(e event.Event) {
 	if sp != "" {
 		_ = saveTelemetry(sp+".telemetry.json", tab.telemetrySnapshot())
 	}
+}
+
+func (s *tabEventSink) resetPlannerDisplayTurn() {
+	tab, _ := s.eventTabAndController()
+	if tab != nil {
+		tab.resetPlannerDisplayTurn()
+	}
+}
+
+func (s *tabEventSink) recordPlannerDisplay(e event.Event) {
+	tab, _ := s.eventTabAndController()
+	if tab != nil {
+		tab.recordPlannerDisplayEvent(e)
+	}
+}
+
+func (s *tabEventSink) flushPlannerDisplay() {
+	tab, ctrl := s.eventTabAndController()
+	if tab == nil || ctrl == nil {
+		return
+	}
+	messages := tab.takePlannerDisplayTurn()
+	if len(messages) == 0 {
+		return
+	}
+	sessionPath := ctrl.SessionPath()
+	if sessionPath == "" {
+		return
+	}
+	userContent := lastUserMessageContent(ctrl.History())
+	if strings.TrimSpace(userContent) == "" {
+		return
+	}
+	_ = recordSessionPlannerDisplay(controllerSessionDir(ctrl), sessionPath, userContent, messages)
+}
+
+func (s *tabEventSink) eventTabAndController() (*WorkspaceTab, control.SessionAPI) {
+	if s.app == nil {
+		return nil, nil
+	}
+	s.app.mu.RLock()
+	defer s.app.mu.RUnlock()
+	tab := s.app.tabByEventSinkIDLocked(s.tabID)
+	if tab == nil {
+		return nil, nil
+	}
+	return tab, tab.Ctrl
+}
+
+func lastUserMessageContent(msgs []provider.Message) string {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == provider.RoleUser {
+			return msgs[i].Content
+		}
+	}
+	return ""
 }
 
 func (s *tabEventSink) telemetryTab() (*WorkspaceTab, string) {
@@ -1127,6 +1340,9 @@ func (a *App) OpenTopicSession(scope, workspaceRoot, topicID, sessionPath string
 // the classic tab path, then prunes every non-active visible tab so historical
 // clicks do not accumulate hidden startup work.
 func (a *App) ActivateTopic(scope, workspaceRoot, topicID, sessionPath string) (TabMeta, error) {
+	a.singleSurfaceMu.Lock()
+	defer a.singleSurfaceMu.Unlock()
+
 	var meta TabMeta
 	var err error
 	if strings.TrimSpace(sessionPath) != "" {
@@ -1146,6 +1362,9 @@ func (a *App) ActivateTopic(scope, workspaceRoot, topicID, sessionPath string) (
 // creating or reusing a blank session, it removes other visible tabs while
 // preserving running runtimes as detached background sessions.
 func (a *App) EnsureBlankSurface(scope, workspaceRoot string) (TabMeta, error) {
+	a.singleSurfaceMu.Lock()
+	defer a.singleSurfaceMu.Unlock()
+
 	meta, err := a.EnsureBlankTab(scope, workspaceRoot)
 	if err != nil {
 		return TabMeta{}, err
@@ -1204,6 +1423,7 @@ func (a *App) EnsureBlankTab(scope, workspaceRoot string) (TabMeta, error) {
 	if scope == "global" {
 		actualRoot = globalRoot
 	}
+	defaultModel, defaultToolApprovalMode := desktopNewSessionDefaults()
 
 	a.mu.Lock()
 	for _, id := range a.orderedTabIDsLocked() {
@@ -1221,21 +1441,20 @@ func (a *App) EnsureBlankTab(scope, workspaceRoot string) (TabMeta, error) {
 		}
 	}
 
-	// Inherit model, effort, token mode, mode, tool-approval, and MCP state from the
-	// active tab so a new blank session keeps the same settings (#4019).
-	var inheritedModel string
+	// New blank sessions start from global session defaults for model and
+	// Ask/Auto/YOLO approval posture. Keep the remaining execution-local settings
+	// from the active tab so a new blank session preserves effort/token/MCP
+	// continuity without letting the active tab override global defaults (#4019).
+	inheritedModel := defaultModel
 	var inheritedEffort *string
 	inheritedTokenMode := boot.TokenModeFull
-	inheritedMode := "normal"
-	inheritedToolApprovalMode := control.ToolApprovalAsk
+	inheritedMode := tabModeFromAxes(false, defaultToolApprovalMode == control.ToolApprovalYolo)
+	inheritedToolApprovalMode := defaultToolApprovalMode
 	inheritedDisabledMCP := map[string]ServerView{}
 	var inheritedMCPOrder []string
 	if active := a.activeTabLocked(); active != nil {
-		inheritedModel = active.model
 		inheritedEffort = cloneStringPtr(active.effort)
 		inheritedTokenMode = currentTabTokenMode(active)
-		inheritedMode = currentTabMode(active)
-		inheritedToolApprovalMode = currentTabToolApprovalMode(active)
 		inheritedDisabledMCP = cloneServerViewMap(active.disabledMCP)
 		inheritedMCPOrder = append([]string(nil), active.mcpOrder...)
 	}
@@ -1659,6 +1878,9 @@ func (a *App) keepOnlyVisibleTab(tabID string) (TabMeta, error) {
 }
 
 func (a *App) applySingleSurfaceTabPolicy() error {
+	a.singleSurfaceMu.Lock()
+	defer a.singleSurfaceMu.Unlock()
+
 	a.mu.RLock()
 	tabID := a.activeTabID
 	if tabID == "" || a.tabs[tabID] == nil {
@@ -4262,6 +4484,7 @@ type topicTrashTarget struct {
 }
 
 func (a *App) topicTrashTargets(topicID string) ([]topicTrashTarget, error) {
+	topicID = strings.TrimSpace(topicID)
 	var targets []topicTrashTarget
 	seen := map[string]bool{}
 	addTarget := func(dir, path string) error {
@@ -4281,15 +4504,15 @@ func (a *App) topicTrashTargets(topicID string) ([]topicTrashTarget, error) {
 		return nil
 	}
 	for _, dir := range a.knownSessionDirs() {
-		infos, err := agent.ListSessions(dir)
+		index, err := topicSessionIndexForDir(dir)
 		if err != nil {
 			return nil, err
 		}
-		for _, info := range infos {
-			if info.TopicID != topicID {
+		for _, match := range index.byTopic[topicID] {
+			if agent.IsCleanupPending(match.path) {
 				continue
 			}
-			if err := addTarget(dir, info.Path); err != nil {
+			if err := addTarget(dir, match.path); err != nil {
 				return nil, err
 			}
 		}
@@ -4886,7 +5109,7 @@ func currentTabCollaborationMode(tab *WorkspaceTab) string {
 	if tab == nil {
 		return "normal"
 	}
-	if tab.Ctrl != nil && tab.Ctrl.PlanMode() {
+	if tabModeHasPlan(currentTabMode(tab)) {
 		return "plan"
 	}
 	if strings.TrimSpace(currentTabGoal(tab)) != "" && currentTabGoalStatus(tab) == control.GoalStatusRunning {

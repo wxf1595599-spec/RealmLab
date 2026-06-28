@@ -71,6 +71,15 @@ func (r *sessionContextRunner) Run(ctx context.Context, input string) error {
 	return nil
 }
 
+type cancelingRunner struct {
+	cancel context.CancelFunc
+}
+
+func (r cancelingRunner) Run(_ context.Context, _ string) error {
+	r.cancel()
+	return nil
+}
+
 type fakeControlTool struct{ name string }
 
 func (t fakeControlTool) Name() string { return t.name }
@@ -295,6 +304,39 @@ func TestRunInjectsParentSessionForJobs(t *testing.T) {
 	}
 }
 
+func TestRunStopHookIgnoresCanceledCallerContext(t *testing.T) {
+	runCtx, cancel := context.WithCancel(context.Background())
+	var stopCalls int
+	var stopErr error
+	hooks := hook.NewRunner([]hook.ResolvedHook{{
+		HookConfig: hook.HookConfig{Command: "record-stop"},
+		Event:      hook.Stop,
+		Scope:      hook.ScopeProject,
+	}}, "", func(ctx context.Context, in hook.SpawnInput) hook.SpawnResult {
+		stopCalls++
+		stopErr = ctx.Err()
+		return hook.SpawnResult{ExitCode: 0}
+	}, nil)
+	c := New(Options{
+		Runner: cancelingRunner{cancel: cancel},
+		Hooks:  hooks,
+	})
+
+	if err := c.Run(runCtx, "hello"); err != nil {
+		t.Fatal(err)
+	}
+
+	if runCtx.Err() != context.Canceled {
+		t.Fatalf("caller context err = %v, want %v", runCtx.Err(), context.Canceled)
+	}
+	if stopCalls != 1 {
+		t.Fatalf("Stop hook calls = %d, want 1", stopCalls)
+	}
+	if stopErr != nil {
+		t.Fatalf("Stop hook context err = %v, want nil", stopErr)
+	}
+}
+
 func TestSetSessionPathAdoptsTemporaryBackgroundJobs(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.jsonl")
@@ -348,6 +390,70 @@ func TestGoalStatePersistsNextToSessionPath(t *testing.T) {
 	}
 	if state.Goal != "fix the typo" || state.Status != GoalStatusRunning || state.ResearchMode != GoalResearchOn || !state.Strict {
 		t.Fatalf("goal state = %+v, want running strict research goal", state)
+	}
+}
+
+func TestResumeRestoresTerminalGoalTodosFromSidecar(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.jsonl")
+	loaded := agent.NewSession("sys")
+	loaded.Add(provider.Message{
+		Role: provider.RoleAssistant,
+		ToolCalls: []provider.ToolCall{{
+			ID:        "todo-1",
+			Name:      "todo_write",
+			Arguments: `{"todos":[{"content":"Step 1","status":"in_progress"}]}`,
+		}},
+	})
+	loaded.Add(provider.Message{
+		Role:       provider.RoleTool,
+		ToolCallID: "todo-1",
+		Name:       "todo_write",
+		Content:    "ok",
+	})
+	if err := os.WriteFile(goalStatePath(path), []byte(`{"status":"complete","todos":[{"content":"Step 1","status":"completed"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exec := agent.New(nil, nil, agent.NewSession("sys"), agent.Options{}, event.Discard)
+	c := New(Options{Executor: exec, SessionDir: dir, Label: "test"})
+	c.Resume(loaded, path)
+
+	got := c.Todos()
+	if len(got) != 1 || got[0].Content != "Step 1" || got[0].Status != "completed" {
+		t.Fatalf("Todos() after resume = %+v, want completed todos from goal-state sidecar", got)
+	}
+}
+
+func TestResumeKeepsTranscriptTodosForRunningGoalSidecar(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.jsonl")
+	loaded := agent.NewSession("sys")
+	loaded.Add(provider.Message{
+		Role: provider.RoleAssistant,
+		ToolCalls: []provider.ToolCall{{
+			ID:        "todo-1",
+			Name:      "todo_write",
+			Arguments: `{"todos":[{"content":"Step 1","status":"in_progress"}]}`,
+		}},
+	})
+	loaded.Add(provider.Message{
+		Role:       provider.RoleTool,
+		ToolCallID: "todo-1",
+		Name:       "todo_write",
+		Content:    "ok",
+	})
+	if err := os.WriteFile(goalStatePath(path), []byte(`{"status":"running","todos":[{"content":"Step 1","status":"completed"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exec := agent.New(nil, nil, agent.NewSession("sys"), agent.Options{}, event.Discard)
+	c := New(Options{Executor: exec, SessionDir: dir, Label: "test"})
+	c.Resume(loaded, path)
+
+	got := c.Todos()
+	if len(got) != 1 || got[0].Content != "Step 1" || got[0].Status != "in_progress" {
+		t.Fatalf("Todos() after resume = %+v, want transcript todos while goal state is running", got)
 	}
 }
 
@@ -1182,6 +1288,121 @@ func TestApprovalPersistentBashPrefixRememberRule(t *testing.T) {
 		!strings.Contains(notices[0], i18n.M.ProjectConfigDisplayName) ||
 		strings.Contains(notices[0], "reasonix.toml") {
 		t.Fatalf("notices = %v, want saved rule notice", notices)
+	}
+}
+
+func TestPlanModeReadOnlyTrustApprovalPersistsMCPTrust(t *testing.T) {
+	ids := make(chan string, 2)
+	var approval event.Approval
+	var notices []string
+	var rememberedServer, rememberedTool string
+	prompts := 0
+	c := New(Options{
+		Sink: event.FuncSink(func(e event.Event) {
+			if e.Kind == event.ApprovalRequest {
+				prompts++
+				approval = e.Approval
+				ids <- e.Approval.ID
+			}
+			if e.Kind == event.Notice {
+				notices = append(notices, e.Text)
+			}
+		}),
+		OnRememberMCPReadOnlyTrust: func(serverName, rawToolName string) MCPReadOnlyTrustResult {
+			rememberedServer, rememberedTool = serverName, rawToolName
+			return MCPReadOnlyTrustResult{Server: serverName, Tool: rawToolName, Path: "reasonix.toml", Saved: true}
+		},
+	})
+
+	go func() {
+		c.Approve(<-ids, true, true, true)
+	}()
+	req := agent.PlanModeReadOnlyTrustRequest{
+		ToolName:    "mcp__github__issue_read",
+		ServerName:  "github",
+		RawToolName: "issue/read",
+		Args:        json.RawMessage(`{"issue":1}`),
+	}
+	allow, reason, err := planModeReadOnlyTrustApprover{c}.CheckPlanModeReadOnlyTrust(context.Background(), req)
+	if err != nil || !allow || reason != "" {
+		t.Fatalf("CheckPlanModeReadOnlyTrust = (%v,%q,%v), want allow", allow, reason, err)
+	}
+	if approval.Tool != "mcp__github__issue_read" || !strings.Contains(approval.Subject, "github/issue/read") || !strings.Contains(approval.Reason, "read-only") {
+		t.Fatalf("approval = %+v, want MCP read-only trust prompt", approval)
+	}
+	if rememberedServer != "github" || rememberedTool != "issue/read" {
+		t.Fatalf("remembered MCP trust = %s/%s, want github/issue/read", rememberedServer, rememberedTool)
+	}
+	if len(notices) != 1 || !strings.Contains(notices[0], "github/issue/read") {
+		t.Fatalf("notices = %v, want MCP trust saved notice", notices)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	allow, reason, err = planModeReadOnlyTrustApprover{c}.CheckPlanModeReadOnlyTrust(ctx, req)
+	if err != nil || !allow || reason != "" {
+		t.Fatalf("second CheckPlanModeReadOnlyTrust = (%v,%q,%v), want session grant", allow, reason, err)
+	}
+	if prompts != 1 {
+		t.Fatalf("approval prompts = %d, want 1", prompts)
+	}
+}
+
+func TestPlanModeReadOnlyTrustApprovalIgnoresToolAutoApproval(t *testing.T) {
+	approvalRequests := make(chan event.Approval, 1)
+	c := New(Options{
+		Sink: event.FuncSink(func(e event.Event) {
+			if e.Kind == event.ApprovalRequest {
+				approvalRequests <- e.Approval
+			}
+		}),
+	})
+	c.SetAutoApproveTools(true)
+
+	type trustResult struct {
+		allow  bool
+		reason string
+		err    error
+	}
+	done := make(chan trustResult, 1)
+	req := agent.PlanModeReadOnlyTrustRequest{
+		ToolName:    "mcp__github__issue_read",
+		ServerName:  "github",
+		RawToolName: "issue/read",
+	}
+	go func() {
+		allow, reason, err := planModeReadOnlyTrustApprover{c}.CheckPlanModeReadOnlyTrust(context.Background(), req)
+		done <- trustResult{allow: allow, reason: reason, err: err}
+	}()
+
+	var approval event.Approval
+	select {
+	case approval = <-approvalRequests:
+	case <-time.After(2 * time.Second):
+		t.Fatal("MCP read-only trust prompt was not emitted under tool auto-approval")
+	}
+	if approval.Tool != "mcp__github__issue_read" || !strings.Contains(approval.Subject, "github/issue/read") {
+		t.Fatalf("approval = %+v, want MCP read-only trust prompt", approval)
+	}
+	select {
+	case got := <-done:
+		t.Fatalf("tool auto-approval must not answer MCP read-only trust, got %+v", got)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	c.Approve(approval.ID, true, true, false)
+	select {
+	case got := <-done:
+		if got.err != nil || !got.allow || got.reason != "" {
+			t.Fatalf("CheckPlanModeReadOnlyTrust after approval = %+v, want allow", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("MCP read-only trust prompt stayed blocked after Approve")
+	}
+
+	allow, reason, err := planModeReadOnlyTrustApprover{c}.CheckPlanModeReadOnlyTrust(context.Background(), req)
+	if err != nil || !allow || reason != "" {
+		t.Fatalf("session-granted MCP read-only trust under YOLO = (%v,%q,%v), want allow", allow, reason, err)
 	}
 }
 

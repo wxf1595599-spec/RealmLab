@@ -5,6 +5,8 @@
 // that streams a canned turn through the same contract — letting the whole UI be
 // developed and laid out without rebuilding the Go side.
 
+// @ts-ignore `wails generate module` creates this locally; fresh checkouts keep
+// typecheck green by falling back to a disabled drift check below.
 import type * as GeneratedApp from "../../wailsjs/go/main/App";
 
 import { addBreadcrumb } from "./breadcrumbs";
@@ -12,7 +14,7 @@ import { t } from "./i18n";
 import { providerRequiresKey } from "./providerModels";
 import { DEFAULT_STATUS_BAR_ITEMS, normalizeStatusBarItems } from "./statusBarItems";
 import { REALMLAB_DEFAULT_THEME, REALMLAB_DEFAULT_THEME_STYLE } from "./theme";
-import { modeWithAutoApproveTools, modeWithPlan, normalizeCollaborationMode, normalizeMode, normalizeTokenMode, normalizeToolApprovalMode } from "./types";
+import { modeHasAutoApproveTools, modeWithAutoApproveTools, modeWithPlan, normalizeCollaborationMode, normalizeMode, normalizeTokenMode, normalizeToolApprovalMode } from "./types";
 
 import type {
   BalanceInfo,
@@ -40,6 +42,7 @@ import type {
   MemorySuggestionsView,
   MemoryView,
   Meta,
+  Mode,
   ModelInfo,
   NetworkView,
   ProjectNode,
@@ -57,6 +60,7 @@ import type {
   SlashArgsResult,
   TabMeta,
   TopicMeta,
+  ToolApprovalMode,
   UpdateDownloadResult,
   UpdateInfo,
   UpdateProgress,
@@ -206,6 +210,9 @@ export interface AppBindings {
   RemoveMCPServer(name: string): Promise<void>;
   ReconnectMCPServer(name: string): Promise<void>;
   ClearMCPServerAuthentication(name: string): Promise<void>;
+  TrustMCPServerTool(name: string, toolName: string): Promise<void>;
+  TrustMCPServerTools(name: string, toolNames: string[]): Promise<void>;
+  UntrustMCPServerTool(name: string, toolName: string): Promise<void>;
   PickSkillFolder(): Promise<string>;
   AddSkillPath(path: string): Promise<void>;
   RemoveSkillPath(path: string): Promise<void>;
@@ -269,6 +276,7 @@ export interface AppBindings {
   SetSubagentModel(ref: string): Promise<void>;
   SetSubagentEffort(level: string): Promise<void>;
   SetAutoPlan(mode: string): Promise<void>;
+  SetDefaultToolApprovalMode(mode: string): Promise<void>;
   SaveProvider(p: ProviderView): Promise<void>;
   AddOfficialProviderAccess(kind: string, key: string): Promise<string>;
   FetchProviderModels(p: ProviderView): Promise<string[]>;
@@ -282,6 +290,7 @@ export interface AppBindings {
   SetSandbox(bash: string, network: boolean, workspaceRoot: string, allowWrite: string[], shell: string): Promise<void>;
   SetNetwork(n: NetworkView): Promise<void>;
   SetBotSettings(b: BotSettingsView): Promise<void>;
+  SetBotConnectionToolApprovalMode(connID: string, mode: string): Promise<void>;
   SetBotSecret(envName: string, value: string): Promise<void>;
   ClearBotSecret(envName: string): Promise<void>;
   StartBotConnectionInstall(provider: string, domain: string): Promise<BotInstallStartResult>;
@@ -360,7 +369,15 @@ export interface AppBindings {
 // mismatch would produce false positives. Method-arity and parameter-order drift
 // are caught at the call sites by tsc when components invoke app.<method>(...).
 type AssertNever<T extends never> = T;
-export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings>>;
+type GeneratedAppKeys = keyof typeof GeneratedApp;
+type GeneratedAppMissing =
+  string extends GeneratedAppKeys ? true :
+  number extends GeneratedAppKeys ? true :
+  symbol extends GeneratedAppKeys ? true :
+  false;
+export type _CheckGenToApp = AssertNever<
+  GeneratedAppMissing extends true ? never : Exclude<GeneratedAppKeys, keyof AppBindings>
+>;
 
 interface WailsRuntime {
   EventsOn(name: string, cb: (...data: unknown[]) => void): () => void;
@@ -553,12 +570,12 @@ function bridgeBreadcrumb(method: string): string {
     return `turn ${method}`;
   if (/^(SetModel|SetEffort|SetTokenMode|SetDefaultModel|SetPlannerModel|SetSubagentModel|SetSubagentEffort)/.test(method))
     return `model ${method}`;
-  if (/^(SetDesktop|SetCloseBehavior|SetDisplayMode|SetStatusBar|SetExpandThinking|SetAutoPlan|SetMemoryCompilerEnabled|SetReasoningLanguage)/.test(method))
+  if (/^(SetDesktop|SetCloseBehavior|SetDisplayMode|SetStatusBar|SetExpandThinking|SetAutoPlan|SetDefaultToolApprovalMode|SetMemoryCompilerEnabled|SetReasoningLanguage)/.test(method))
     return `settings ${method}`;
   if (/^(SaveProvider|AddOfficialProviderAccess|RemoveProviderAccess|DeleteProvider|SetProviderKey|ClearProviderKey|FetchProviderModels|ConnectKey)/.test(method))
     return `provider ${method}`;
   if (/^(CheckUpdate|DownloadUpdate|InstallUpdate|ApplyUpdate|OpenDownloadPage)/.test(method)) return `update ${method}`;
-  if (/^(AddMCPServer|UpdateMCPServer|RemoveMCPServer|ReconnectMCPServer|ClearMCPServerAuthentication|SetMCPServer)/.test(method))
+  if (/^(AddMCPServer|UpdateMCPServer|RemoveMCPServer|ReconnectMCPServer|ClearMCPServerAuthentication|TrustMCPServerTool|TrustMCPServerTools|UntrustMCPServerTool|SetMCPServer)/.test(method))
     return `mcp ${method}`;
   if (/^(AddSkillPath|RemoveSkillPath|RefreshSkills|SetSkillEnabled|AcceptSkillSuggestion)/.test(method))
     return `skill ${method}`;
@@ -621,6 +638,12 @@ function emit(e: WireEvent) {
   listeners.forEach((l) => l(event));
 }
 
+export function mockToolApprovalModeAfterModeChange(current: string | undefined, nextMode: Mode): ToolApprovalMode {
+  if (modeHasAutoApproveTools(nextMode)) return "yolo";
+  const currentMode = normalizeToolApprovalMode(current);
+  return currentMode === "yolo" ? "ask" : currentMode;
+}
+
 async function withMockTabScope<T>(tabId: string, fn: () => Promise<T>): Promise<T> {
   const previous = mockScopedTabId;
   mockScopedTabId = tabId || previous;
@@ -669,15 +692,34 @@ function makeMockApp(): AppBindings {
   let cancelled = false;
   let pendingAskPreview = false;
   let pendingApprovalPreview = false;
-  const globalWorkspaceRoot = "~/Library/Application Support/reasonix/global-workspace";
+  const globalWorkspaceRoot = "~/Library/Application Support/RealmLab/global-workspace";
   let cwd = freshMock ? globalWorkspaceRoot : "~/projects/joyquant-db"; // mutable so PickWorkspace is visible in dev
-  let workspaces = freshMock ? [] : ["~/projects/joyquant-db", "~/projects/joyquant-sys", "~/projects/reasonix", "~/projects/blade"];
+  let workspaces = freshMock ? [] : ["~/projects/joyquant-db", "~/projects/joyquant-sys", "~/projects/realmlab", "~/projects/blade"];
   let mockEffort = "auto";
   const day = 86_400_000;
   const t0 = Date.now();
   // Mutable so MCP add/remove/retry are observable in browser dev.
   let capServers: ServerView[] = [
-    { name: "github", transport: "stdio", status: "connected", configured: true, autoStart: true, tier: "background", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], tools: 12, prompts: 2, resources: 0 },
+    {
+      name: "github",
+      transport: "stdio",
+      status: "connected",
+      configured: true,
+      autoStart: true,
+      tier: "background",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-github"],
+      tools: 4,
+      prompts: 2,
+      resources: 0,
+      trustedReadOnlyTools: ["pull_request_read"],
+      toolList: [
+        { name: "issue_read", description: "Read GitHub issue details and comments.", readOnlyHint: true },
+        { name: "pull_request_read", description: "Read pull request metadata, files, and review threads.", readOnlyHint: true },
+        { name: "search_issues", description: "Search issues and pull requests.", readOnlyHint: true },
+        { name: "issue_write", description: "Create or update GitHub issues." },
+      ],
+    },
     {
       name: "linear",
       transport: "http",
@@ -707,10 +749,10 @@ function makeMockApp(): AppBindings {
   const capSkills: SkillView[] = [
     { name: "explore", description: "Investigate the codebase in an isolated subagent", scope: "builtin", runAs: "subagent", enabled: true },
     { name: "review", description: "Review the staged diff", scope: "project", runAs: "inline", enabled: false },
-    { name: "init", description: "Scaffold a REASONIX.md for this repo", scope: "builtin", runAs: "inline", enabled: true },
+    { name: "init", description: "Scaffold an AGENTS.md for this repo", scope: "builtin", runAs: "inline", enabled: true },
   ];
   let capSkillRoots: SkillRootView[] = [
-    { dir: "~/projects/reasonix/.reasonix/skills", scope: "project", priority: 1, status: "missing", configured: false, removable: true, skills: 0 },
+    { dir: "~/projects/realmlab/.reasonix/skills", scope: "project", priority: 1, status: "missing", configured: false, removable: true, skills: 0 },
     {
       dir: "~/.reasonix/skills",
       scope: "global",
@@ -721,7 +763,7 @@ function makeMockApp(): AppBindings {
       skills: 2,
       skillItems: [
         { name: "explore", description: "Investigate the codebase in an isolated subagent", scope: "global", runAs: "subagent" },
-        { name: "init", description: "Scaffold a REASONIX.md for this repo", scope: "global", runAs: "inline" },
+        { name: "init", description: "Scaffold an AGENTS.md for this repo", scope: "global", runAs: "inline" },
       ],
     },
   ];
@@ -935,11 +977,12 @@ function makeMockApp(): AppBindings {
     displayMode: "compact",
     statusBarStyle: "text",
     statusBarItems: [...DEFAULT_STATUS_BAR_ITEMS],
+    defaultToolApprovalMode: "ask",
     checkUpdates: true,
     telemetry: true,
     metrics: true,
     memoryCompilerEnabled: true,
-    configPath: "~/projects/reasonix/reasonix.toml",
+    configPath: "~/projects/realmlab/project-config.toml",
     providerKinds: ["openai"],
     autoApproveTools: false,
     bypass: false,
@@ -969,7 +1012,7 @@ function makeMockApp(): AppBindings {
     provider.apiKeyEnv === "DEEPSEEK_API_KEY" ? { ...provider, keySet: !freshMock } : provider,
   );
   if (freshMock) {
-    settings.configPath = "~/.config/reasonix/config.toml";
+    settings.configPath = "~/.config/realmlab/config.toml";
   }
   const mockNow = Date.now();
   const mockProjectTree: ProjectNode[] = freshMock ? [] : [
@@ -1682,7 +1725,7 @@ function makeMockApp(): AppBindings {
                   ...tab,
                   mode: nextMode,
                   collaborationMode: normalizeCollaborationMode(undefined, tab.goal, nextMode),
-                  toolApprovalMode: normalizeToolApprovalMode(undefined, nextMode),
+                  toolApprovalMode: mockToolApprovalModeAfterModeChange(tab.toolApprovalMode, nextMode),
                 }
               : tab,
           );
@@ -1874,7 +1917,7 @@ function makeMockApp(): AppBindings {
     async PickWorkspace() {
       // Browser dev has no native dialog; simulate picking a folder and re-root so
       // the topbar folder chip visibly changes.
-      return mockSwitchWorkspace(cwd.endsWith("another-project") ? "~/projects/reasonix" : "~/projects/another-project");
+      return mockSwitchWorkspace(cwd.endsWith("another-project") ? "~/projects/realmlab" : "~/projects/another-project");
     },
     async SwitchWorkspace(path: string) {
       return mockSwitchWorkspace(path);
@@ -1924,6 +1967,7 @@ function makeMockApp(): AppBindings {
             workspacePath,
             sandboxPath: settings.sandbox.workspaceRoot,
             gitBranch: active?.gitBranch || (active?.scope === "project" ? "main" : ""),
+            imageInputEnabled: true,
             autoApproveTools,
             bypass: autoApproveTools,
             collaborationMode,
@@ -2025,6 +2069,7 @@ function makeMockApp(): AppBindings {
           url: input.transport === "stdio" ? "" : input.url,
           envKeys: input.env ? Object.keys(input.env).sort() : s.envKeys,
           headerKeys: input.headers ? Object.keys(input.headers).sort() : s.headerKeys,
+          trustedReadOnlyTools: input.trustedReadOnlyTools ?? s.trustedReadOnlyTools,
           tools: nextTools,
           error: undefined,
           authStatus: nextStatus !== "connected" && input.transport !== "stdio" ? "possible" : undefined,
@@ -2060,6 +2105,33 @@ function makeMockApp(): AppBindings {
             }
           : s,
       );
+    },
+    async TrustMCPServerTool(name: string, toolName: string) {
+      const normalizedTool = toolName.trim();
+      if (!normalizedTool) return;
+      capServers = capServers.map((s) => {
+        if (s.name !== name) return s;
+        const trusted = Array.from(new Set([...(s.trustedReadOnlyTools ?? []), normalizedTool]));
+        return { ...s, trustedReadOnlyTools: trusted };
+      });
+    },
+    async TrustMCPServerTools(name: string, toolNames: string[]) {
+      const normalizedTools = toolNames.map((tool) => tool.trim()).filter(Boolean);
+      if (normalizedTools.length === 0) return;
+      capServers = capServers.map((s) => {
+        if (s.name !== name) return s;
+        const trusted = Array.from(new Set([...(s.trustedReadOnlyTools ?? []), ...normalizedTools]));
+        return { ...s, trustedReadOnlyTools: trusted };
+      });
+    },
+    async UntrustMCPServerTool(name: string, toolName: string) {
+      const normalizedTool = toolName.trim();
+      if (!normalizedTool) return;
+      capServers = capServers.map((s) => {
+        if (s.name !== name) return s;
+        const trusted = (s.trustedReadOnlyTools ?? []).filter((tool) => tool !== normalizedTool);
+        return { ...s, trustedReadOnlyTools: trusted };
+      });
     },
     async PickSkillFolder() {
       return "~/my-skills";
@@ -2263,6 +2335,11 @@ function makeMockApp(): AppBindings {
     },
     async AttachDropped(path: string) {
       const name = path.split(/[/\\]/).filter(Boolean).pop() ?? path;
+      const hasExt = /\.\w{1,6}$/i.test(name);
+      if (!hasExt) {
+        const tokenName = name.replace(/[^\w.-]+/g, "-") || "folder";
+        return { kind: "workspace" as const, path: `__reasonix_external_folder/mock/${tokenName}`, isDir: true, displayPath: path };
+      }
       return { kind: "attachment" as const, path: `.reasonix/attachments/mock-${name}` };
     },
     async AttachmentDataURL(_path: string) {
@@ -2468,6 +2545,9 @@ function makeMockApp(): AppBindings {
     async SetAutoPlan(mode: string) {
       settings.autoPlan = mode;
     },
+    async SetDefaultToolApprovalMode(mode: string) {
+      settings.defaultToolApprovalMode = normalizeToolApprovalMode(mode);
+    },
     async SaveProvider(p: ProviderView) {
       p.added = true;
       const i = settings.providers.findIndex((x) => x.name === p.name);
@@ -2532,6 +2612,10 @@ function makeMockApp(): AppBindings {
         async SetBotSettings(b: BotSettingsView) {
           settings.bot = JSON.parse(JSON.stringify(b)) as BotSettingsView;
         },
+        async SetBotConnectionToolApprovalMode(connID, mode) {
+          const conn = settings.bot.connections.find((c) => c.id === connID);
+          if (conn) conn.toolApprovalMode = mode as any;
+        },
         async SetBotSecret(envName: string, _value: string) {
           const name = envName.trim();
           if (settings.bot.qq.appSecretEnv === name) settings.bot.qq.secretSet = true;
@@ -2575,7 +2659,7 @@ function makeMockApp(): AppBindings {
             provider: normalizedProvider,
             domain: normalizedDomain,
             installId: `mock-${normalizedProvider}-${normalizedDomain}`,
-            url: "https://example.com/reasonix-bot-qr",
+            url: "https://example.com/realmlab-bot-qr",
             deviceCode: "MOCKDEVICE",
             userCode: normalizedProvider === "weixin" ? "" : "MOCK-CODE",
             interval: 3,
@@ -2721,7 +2805,7 @@ function makeMockApp(): AppBindings {
       emitUpdater({ phase: "verifying", received: total, total });
       await delay(500);
       emitUpdater({ phase: "downloaded", received: total, total });
-      return { version: "v1.1.0", channel: "stable", path: "/tmp/reasonix-update", size: total, sha256: "mock" };
+      return { version: "v1.1.0", channel: "stable", path: "/tmp/realmlab-update", size: total, sha256: "mock" };
     },
     async InstallUpdate() {
       const total = 12_345_678;
@@ -2736,7 +2820,7 @@ function makeMockApp(): AppBindings {
     },
     async OpenDownloadPage() {
       if (typeof window !== "undefined") {
-        window.open("https://github.com/esengine/reasonix/releases/latest", "_blank", "noopener");
+        window.open("https://github.com/wxf1595599-spec/RealmLab/releases/latest", "_blank", "noopener");
       }
     },
     // Dev seam: drives the overlay flow in the browser until ConnectKey sets the
@@ -2773,6 +2857,7 @@ function makeMockApp(): AppBindings {
         mockTabs = mockTabs.map((tab) => (tab.id === existing.id ? active : { ...tab, active: false }));
         return { ...active };
       }
+      const defaultToolApprovalMode = normalizeToolApprovalMode(settings.defaultToolApprovalMode);
       const tab: TabMeta = {
         id: "tab_" + Date.now(),
         scope: "project",
@@ -2784,12 +2869,12 @@ function makeMockApp(): AppBindings {
         topicTitle: topicLabel(_topicID, t("mock.newSession")),
         sessionPath: `/mock/sessions/${_topicID}.jsonl`,
         projectColor: mockProjectTree.find((node) => node.root === workspaceRoot)?.projectColor,
-        label: "deepseek-v4-flash",
+        label: mockModelLabel(settings.defaultModel),
         ready: true,
         running: mockTopicRunsInScenario(_topicID),
-        mode: "normal",
+        mode: modeWithAutoApproveTools("normal", defaultToolApprovalMode === "yolo"),
         collaborationMode: "normal",
-        toolApprovalMode: "ask",
+        toolApprovalMode: defaultToolApprovalMode,
         tokenMode: "full",
         active: true,
         cwd: workspaceRoot,
@@ -2803,6 +2888,7 @@ function makeMockApp(): AppBindings {
         setMockActiveTab(existing.id);
         return { ...existing, active: true };
       }
+      const defaultToolApprovalMode = normalizeToolApprovalMode(settings.defaultToolApprovalMode);
       const tab: TabMeta = {
         id: "tab_" + Date.now(),
         scope: "global",
@@ -2812,12 +2898,12 @@ function makeMockApp(): AppBindings {
         topicId: _topicID,
         topicTitle: topicLabel(_topicID, "Global"),
         sessionPath: `/mock/sessions/${_topicID}.jsonl`,
-        label: "deepseek-v4-flash",
+        label: mockModelLabel(settings.defaultModel),
         ready: true,
         running: false,
-        mode: "normal",
+        mode: modeWithAutoApproveTools("normal", defaultToolApprovalMode === "yolo"),
         collaborationMode: "normal",
-        toolApprovalMode: "ask",
+        toolApprovalMode: defaultToolApprovalMode,
         tokenMode: "full",
         active: true,
         cwd: "",
