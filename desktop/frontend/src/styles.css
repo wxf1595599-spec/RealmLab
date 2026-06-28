@@ -1943,17 +1943,401 @@ a[href] {
   font-size: 13.5px;
 }
 
-.app--mode-transition-stable .sidebar,
-.app--mode-transition-stable .topicbar,
-.app--mode-transition-stable .transcript,
-.app--mode-transition-stable .chat-pane,
-.app--mode-transition-stable .composer-wrap,
-.app--mode-transition-stable .composer-card,
-.app--mode-transition-stable .composer-modebar__thumb,
-.app--mode-transition-stable .welcome__brand-logo,
-.app--mode-transition-stable .sidebar__brand-logo {
+.app--mode-transition-stable:not(.app--student-mode-transition) .sidebar,
+.app--mode-transition-stable:not(.app--student-mode-transition) .topicbar,
+.app--mode-transition-stable:not(.app--student-mode-transition) .transcript,
+.app--mode-transition-stable:not(.app--student-mode-transition) .chat-pane,
+.app--mode-transition-stable:not(.app--student-mode-transition) .composer-wrap,
+.app--mode-transition-stable:not(.app--student-mode-transition) .composer-card,
+.app--mode-transition-stable:not(.app--student-mode-transition) .composer-modebar__thumb,
+.app--mode-transition-stable:not(.app--student-mode-transition) .welcome__brand-logo,
+.app--mode-transition-stable:not(.app--student-mode-transition) .sidebar__brand-logo {
   transition: none !important;
   animation: none !important;
+}
+
+.student-mode-transition {
+  --student-transition-accent: #e0820f;
+  --student-transition-accent-rgb: 224, 130, 15;
+  --student-transition-veil-a: rgba(248, 250, 252, 0.72);
+  --student-transition-veil-b: rgba(255, 247, 237, 0.66);
+  --student-transition-ink: #111827;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-startup-overlay);
+  overflow: hidden;
+  pointer-events: none;
+  contain: paint;
+  isolation: isolate;
+  animation: student-mode-page-transition 0.76s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.student-mode-transition[data-mode="to-normal"] {
+  --student-transition-accent: #2f6fe0;
+  --student-transition-accent-rgb: 47, 111, 224;
+  --student-transition-veil-a: rgba(246, 248, 252, 0.74);
+  --student-transition-veil-b: rgba(229, 237, 255, 0.62);
+  --student-transition-ink: #111827;
+}
+.student-mode-transition__veil {
+  position: absolute;
+  display: block;
+  inset: 0;
+  opacity: 0;
+  transform: translate3d(0, 0, 0);
+  will-change: opacity, transform;
+}
+.student-mode-transition__veil--from {
+  background:
+    radial-gradient(circle at 50% 47%, rgba(255, 255, 255, 0.95), transparent 190px),
+    linear-gradient(180deg, var(--student-transition-veil-a), rgba(255, 255, 255, 0.32));
+  backdrop-filter: blur(10px) saturate(1.08);
+  animation: student-mode-veil-from 0.76s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.student-mode-transition__veil--to {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(var(--student-transition-accent-rgb), 0.15), transparent 240px),
+    linear-gradient(135deg, transparent, var(--student-transition-veil-b), transparent);
+  animation: student-mode-veil-to 0.76s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.student-mode-transition__grain {
+  position: absolute;
+  display: block;
+  inset: 0;
+  background:
+    radial-gradient(circle at 24% 20%, rgba(var(--student-transition-accent-rgb), 0.08), transparent 120px),
+    radial-gradient(circle at 78% 76%, rgba(47, 111, 224, 0.08), transparent 130px);
+  opacity: 0;
+  transform: scale(1.02);
+  animation: student-mode-grain-breathe 0.76s ease-out both;
+}
+.student-mode-transition__ribbon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: min(820px, 82vw);
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(var(--student-transition-accent-rgb), 0.22), rgba(255, 255, 255, 0.74), transparent);
+  opacity: 0;
+  transform-origin: 50% 50%;
+  will-change: opacity, transform;
+  animation: student-mode-ribbon-sweep 0.68s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.student-mode-transition__ribbon--left {
+  transform: translate(-50%, -50%) rotate(-18deg) scaleX(0);
+}
+.student-mode-transition__ribbon--right {
+  transform: translate(-50%, -50%) rotate(18deg) scaleX(0);
+  animation-delay: 0.08s;
+}
+.student-mode-transition__stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 220px;
+  height: 220px;
+  opacity: 0;
+  transform: translate(-50%, -50%) translateY(12px) scale(0.96);
+  will-change: opacity, transform;
+  animation: student-mode-stage-reveal 0.76s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.student-mode-transition__aura {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 172px;
+  height: 172px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.9), transparent 58%),
+    radial-gradient(circle, rgba(var(--student-transition-accent-rgb), 0.2), transparent 64%);
+  filter: blur(8px);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.72);
+  animation: student-mode-aura 0.76s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.student-mode-transition__mark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 82px;
+  height: 82px;
+  margin-top: 28px;
+  border-radius: 24px;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+.student-mode-transition__mark-glass {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: inherit;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.5)),
+    radial-gradient(circle at 30% 18%, rgba(var(--student-transition-accent-rgb), 0.14), transparent 52%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(var(--student-transition-accent-rgb), 0.13),
+    0 18px 48px rgba(29, 39, 58, 0.16);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+.student-mode-transition__mark img {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 7px 16px rgba(var(--student-transition-accent-rgb), 0.18));
+  opacity: 0.94;
+}
+.student-mode-transition__glyph-stage {
+  position: absolute;
+  left: 50%;
+  top: 91px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 8px 20px rgba(31, 41, 55, 0.11);
+  transform: translate(22px, -50%);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+.student-mode-transition__glyph {
+  position: absolute;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  fill: none;
+  stroke: var(--student-transition-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.2;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.78));
+  will-change: opacity, transform;
+}
+.student-mode-transition__glyph--from {
+  animation: student-mode-glyph-from 0.54s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.student-mode-transition__glyph--to {
+  animation: student-mode-glyph-to 0.58s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+.student-mode-transition__wordmark {
+  margin-top: 18px;
+  color: var(--student-transition-ink);
+  font-size: 22px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.student-mode-transition__dots {
+  display: flex;
+  gap: 7px;
+  margin-top: 18px;
+}
+.student-mode-transition__dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--student-transition-accent) 84%, var(--fg-faint));
+  opacity: 0.32;
+  animation: student-mode-dot-pulse 0.72s ease-in-out both;
+}
+.student-mode-transition__dots span:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.student-mode-transition__dots span:nth-child(3) {
+  animation-delay: 0.16s;
+}
+.app--student-mode-transition .sidebar,
+.app--student-mode-transition .topicbar,
+.app--student-mode-transition .chat-pane,
+.app--student-mode-transition .transcript,
+.app--student-mode-transition .composer-wrap,
+.app--student-mode-transition .workbench-dock {
+  transition:
+    background-color 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.24s ease-out;
+}
+@keyframes student-mode-page-transition {
+  0% {
+    opacity: 0;
+  }
+  15%,
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes student-mode-veil-from {
+  0% {
+    opacity: 0;
+    transform: scale(1.01);
+  }
+  18% {
+    opacity: 1;
+  }
+  74% {
+    opacity: 0.86;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes student-mode-veil-to {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(1.02);
+  }
+  38% {
+    opacity: 0.88;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(1);
+  }
+}
+@keyframes student-mode-grain-breathe {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes student-mode-ribbon-sweep {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--student-ribbon-rotation, -18deg)) scaleX(0);
+  }
+  36% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) rotate(var(--student-ribbon-rotation, -18deg)) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--student-ribbon-rotation, -18deg)) scaleX(0.72);
+  }
+}
+.student-mode-transition__ribbon--left {
+  --student-ribbon-rotation: -18deg;
+}
+.student-mode-transition__ribbon--right {
+  --student-ribbon-rotation: 18deg;
+}
+@keyframes student-mode-stage-reveal {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(16px) scale(0.94);
+  }
+  24% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(-12px) scale(0.98);
+  }
+}
+@keyframes student-mode-aura {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.68);
+  }
+  42% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.14);
+  }
+}
+@keyframes student-mode-glyph-from {
+  0% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  48% {
+    opacity: 0;
+    transform: scale(0.76) rotate(-7deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.76) rotate(-7deg);
+  }
+}
+@keyframes student-mode-glyph-to {
+  0% {
+    opacity: 0;
+    transform: scale(0.76) rotate(7deg);
+  }
+  50% {
+    opacity: 0;
+    transform: scale(0.76) rotate(7deg);
+  }
+  76% {
+    opacity: 1;
+    transform: scale(1.05) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+@keyframes student-mode-dot-pulse {
+  0% {
+    opacity: 0.24;
+    transform: scale(0.8);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.28;
+    transform: scale(0.84);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-mode-transition {
+    display: none;
+  }
+  .app--student-mode-transition .sidebar,
+  .app--student-mode-transition .topicbar,
+  .app--student-mode-transition .chat-pane,
+  .app--student-mode-transition .transcript,
+  .app--student-mode-transition .composer-wrap,
+  .app--student-mode-transition .workbench-dock,
+  .topicbar__action-btn--student-switching,
+  .topicbar__action-btn--student-switching::before,
+  .topicbar__action-btn--student-switching svg {
+    animation: none;
+  }
+  .topicbar__action-btn--student-switching {
+    transform: none;
+  }
 }
 
 .layout {
@@ -17326,6 +17710,8 @@ a[href] {
    solid orange "on" pill when active. References the MicroRealm Lab orange.
    color-mix keeps it readable in both light and dark Slate. */
 .topicbar__action-btn--student {
+  position: relative;
+  overflow: visible;
   color: #e0820f;
   border-color: color-mix(in srgb, #e8881f 45%, var(--border));
   background: color-mix(in srgb, #e8881f 10%, var(--bg-elev));
@@ -17347,6 +17733,53 @@ a[href] {
 
 .topicbar__action-btn--student-active:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in srgb, #e0820f 30%, transparent);
+}
+.topicbar__action-btn--student-switching {
+  animation: student-mode-button-morph 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.topicbar__action-btn--student-switching::before {
+  position: absolute;
+  inset: -4px;
+  border: 1px solid color-mix(in srgb, #e0820f 22%, transparent);
+  border-radius: 12px;
+  content: "";
+  pointer-events: none;
+  animation: student-mode-button-ring 0.24s ease-out both;
+}
+.topicbar__action-btn--student-switching svg {
+  animation: student-mode-button-cap 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes student-mode-button-morph {
+  0% {
+    transform: scale(1);
+  }
+  48% {
+    transform: scale(0.985);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes student-mode-button-ring {
+  0% {
+    opacity: 0.12;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+@keyframes student-mode-button-cap {
+  0% {
+    transform: scale(1);
+  }
+  48% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .topicbar__export {

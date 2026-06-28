@@ -78,6 +78,12 @@ for (const section of [
 }
 includes(design, "不要借题发挥", "DESIGN keeps the scoped-change rule explicit");
 includes(design, "新增样式必须局部 scope", "DESIGN locks scoped CSS maintenance");
+includes(design, "中心 MicroRealm symbol", "DESIGN locks the student mode transition direction");
+includes(design, "StudentModeTransition", "DESIGN names the independent student mode transition component");
+includes(design, "全屏独立转场层", "DESIGN locks the distinctive student mode page transition");
+includes(design, "登录/启动动画的视觉语言", "DESIGN anchors the student mode transition to the startup animation language");
+includes(design, "禁止仅做按钮附近小徽章", "DESIGN rejects button-only student mode transitions");
+includes(design, "全屏高透明彩色 wash/sheen", "DESIGN rejects dramatic student mode transitions");
 
 includes(agents, "docs/REALMLAB_SITE_BRIEF.md", "AGENTS requires the RealmLab site brief for site work");
 includes(siteBrief, "`site/` 是上游兼容 marketing surface", "site brief keeps site outside the desktop product core");

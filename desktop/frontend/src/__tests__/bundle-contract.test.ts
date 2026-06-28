@@ -100,7 +100,7 @@ ok(
 );
 ok(
   appSource.includes("app--mode-transition-stable") &&
-    /app--mode-transition-stable \.composer-modebar__thumb[\s\S]*transition: none !important;[\s\S]*animation: none !important;/.test(stylesSource),
+    /app--mode-transition-stable(?::not\(\.app--student-mode-transition\))? \.composer-modebar__thumb[\s\S]*transition: none !important;[\s\S]*animation: none !important;/.test(stylesSource),
   "mode switches suppress transient chrome animations that can read as flicker",
 );
 ok(

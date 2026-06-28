@@ -51,6 +51,8 @@ function DuplicateToastTrigger() {
 const here = dirname(fileURLToPath(import.meta.url));
 const frontendRoot = resolve(here, "..");
 const appSource = readFileSync(resolve(frontendRoot, "App.tsx"), "utf8");
+const transitionSource = readFileSync(resolve(frontendRoot, "components/StudentModeTransition.tsx"), "utf8");
+const stylesSource = readFileSync(resolve(frontendRoot, "styles.css"), "utf8");
 const englishLocale = readFileSync(resolve(frontendRoot, "locales/en.ts"), "utf8");
 const chineseLocale = readFileSync(resolve(frontendRoot, "locales/zh.ts"), "utf8");
 
@@ -69,6 +71,35 @@ ok(
     appSource.includes("setModeTransitionStable(true)") &&
     appSource.includes("setModeTransitionStable(false)"),
   "student mode and composer mode switches use a brief transition-stable frame",
+);
+ok(
+    appSource.includes("studentModeTransition") &&
+    appSource.includes("<StudentModeTransition direction={studentModeTransition} />") &&
+    transitionSource.includes("logoSymbol") &&
+    transitionSource.includes("student-mode-transition__veil--from") &&
+    transitionSource.includes("student-mode-transition__stage") &&
+    transitionSource.includes("student-mode-transition__wordmark") &&
+    transitionSource.includes("student-mode-transition__glyph--student") &&
+    transitionSource.includes("STUDENT_MODE_TRANSITION_MS = 760") &&
+    appSource.includes("topicbar__action-btn--student-switching"),
+  "student mode switch delegates startup-variant page transition to an independent component",
+);
+ok(
+  /@keyframes student-mode-page-transition/.test(stylesSource) &&
+    /@keyframes student-mode-stage-reveal/.test(stylesSource) &&
+    /@keyframes student-mode-veil-to/.test(stylesSource) &&
+    /@keyframes student-mode-glyph-to/.test(stylesSource) &&
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.student-mode-transition/.test(stylesSource),
+  "student mode page transition has motion and reduced-motion coverage",
+);
+ok(
+  !/student-mode-transition-wash|student-mode-transition-sheen|student-mode-content-settle/.test(stylesSource),
+  "student mode transition avoids high-flash wash, sheen, and page settle effects",
+);
+ok(
+  appSource.includes("clearStudentModeTransition()") &&
+    !appSource.includes("startStudentModeTransition(studentModeEnabled ? \"to-student\" : \"to-normal\")"),
+  "student mode sync rollback clears transition instead of replaying a second animation",
 );
 ok(
   /studentModeTooltipLabel\s*=\s*studentModeSwitchBlocked && !studentModeSyncing\s*\?\s*t\("common\.busyHint"\)/.test(appSource) &&
