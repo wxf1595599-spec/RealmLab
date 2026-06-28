@@ -74,9 +74,7 @@ jobs:
       - name: UI parity gate
         run: |
           corepack pnpm --dir desktop/frontend install --frozen-lockfile
-          corepack pnpm --dir desktop/frontend build
           corepack pnpm --dir desktop/frontend exec tsx src/__tests__/realmlab-design-contract.test.ts
-          corepack pnpm --dir desktop/frontend exec tsx src/__tests__/context-panel-breakdown.test.ts
           corepack pnpm --dir desktop/frontend exec tsx src/__tests__/app-chrome-tabs.test.ts
 
       - name: Resolve release version
@@ -95,6 +93,10 @@ jobs:
 
       - name: Build and package installer
         run: scripts/desktop-build.sh "${{ matrix.platform }}" "${{ steps.version.outputs.version }}" stable
+
+      - name: Post-build UI parity tests
+        run: |
+          corepack pnpm --dir desktop/frontend exec tsx src/__tests__/context-panel-breakdown.test.ts
 
       - name: Verify macOS artifacts
         if: runner.os == 'macOS'
