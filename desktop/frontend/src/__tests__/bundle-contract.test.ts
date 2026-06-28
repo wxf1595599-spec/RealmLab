@@ -23,6 +23,11 @@ const appSource = readFileSync(resolve(here, "../App.tsx"), "utf8");
 const settingsSource = readFileSync(resolve(here, "../components/SettingsPanel.tsx"), "utf8");
 const markdownSource = readFileSync(resolve(here, "../components/Markdown.tsx"), "utf8");
 const bridgeSource = readFileSync(resolve(here, "../lib/bridge.ts"), "utf8");
+const localeSource = [
+  readFileSync(resolve(here, "../locales/en.ts"), "utf8"),
+  readFileSync(resolve(here, "../locales/zh.ts"), "utf8"),
+  readFileSync(resolve(here, "../locales/zh-TW.ts"), "utf8"),
+].join("\n");
 const stylesSource = readFileSync(resolve(here, "../styles.css"), "utf8");
 const wailsConfig = readFileSync(resolve(repoRoot, "desktop/wails.json"), "utf8");
 const publishInstallersWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/publish-installers.yml"), "utf8");
@@ -78,16 +83,20 @@ ok(
   "Markdown wrapper loads markdown renderer on demand",
 );
 ok(
-  /function mockScenario\(\): "demo" \| "fresh" \| "running" \{[\s\S]*return "fresh";[\s\S]*import\.meta\.env\.DEV[\s\S]*value === "demo"[\s\S]*return "demo";[\s\S]*return "fresh";[\s\S]*\}/.test(bridgeSource),
+  /function mockScenario\(\): "demo" \| "fresh" \| "running" \{[\s\S]*return "fresh";[\s\S]*import\.meta\.env\?\.DEV[\s\S]*value === "demo"[\s\S]*return "demo";[\s\S]*return "fresh";[\s\S]*\}/.test(bridgeSource),
   "browser mock defaults to a clean first-run state and keeps seeded demos dev-only",
 );
 ok(
-  /settings\.providers = settings\.providers\.map\(\(provider\) =>[\s\S]*provider\.apiKeyEnv === "DEEPSEEK_API_KEY" \? \{ \.\.\.provider, keySet: !freshMock \}/.test(bridgeSource),
-  "fresh browser mock never reports the packaged DeepSeek key as configured",
+  /settings\.providers = settings\.providers\.map\(\(provider\) =>[\s\S]*provider\.apiKeyEnv === "DEEPSEEK_API_KEY" \? \{ \.\.\.provider, keySet: false \}/.test(bridgeSource),
+  "browser mock never reports a packaged DeepSeek key as configured",
 );
 ok(
   !/reasonix\/global-workspace|github\.com\/esengine\/reasonix\/releases|Scaffold a REASONIX\.md/.test(bridgeSource),
   "browser fallback mock keeps RealmLab first-run copy and links",
+);
+ok(
+  !/joyquant|fix the login bug|Authorization:\s*Bearer\s+sk-|DEEPSEEK_API_KEY\s*=\s*sk-/i.test(`${bridgeSource}\n${localeSource}`),
+  "browser mock and locale seed data contain no private project, chat, or key residue",
 );
 ok(
   appSource.includes("app--mode-transition-stable") &&

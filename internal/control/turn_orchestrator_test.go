@@ -44,7 +44,7 @@ func TestTurnOrchestratorSkipsMemoryCompilerForSyntheticTurns(t *testing.T) {
 	c := New(Options{Runner: runner})
 	o := newTurnOrchestrator(c)
 
-	real := "fix the login bug"
+	real := "review the onboarding flow"
 	if err := o.runTurnWithRawDisplay(context.Background(), real, real, ""); err != nil {
 		t.Fatal(err)
 	}

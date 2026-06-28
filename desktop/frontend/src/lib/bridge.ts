@@ -679,9 +679,10 @@ function browserPlatformOverride(): "darwin" | "windows" | "linux" | "" {
 function mockScenario(): "demo" | "fresh" | "running" {
   if (typeof window === "undefined") return "fresh";
   const value = new URLSearchParams(window.location.search).get("mock")?.trim().toLowerCase();
+  const devMode = import.meta.env?.DEV === true;
   if (value === "fresh" || value === "empty" || value === "first-run") return "fresh";
-  if (import.meta.env.DEV && (value === "running" || value === "busy" || value === "streaming")) return "running";
-  if (import.meta.env.DEV && (value === "demo" || value === "seeded")) return "demo";
+  if (devMode && (value === "running" || value === "busy" || value === "streaming")) return "running";
+  if (devMode && (value === "demo" || value === "seeded")) return "demo";
   return "fresh";
 }
 
@@ -693,8 +694,8 @@ function makeMockApp(): AppBindings {
   let pendingAskPreview = false;
   let pendingApprovalPreview = false;
   const globalWorkspaceRoot = "~/Library/Application Support/RealmLab/global-workspace";
-  let cwd = freshMock ? globalWorkspaceRoot : "~/projects/joyquant-db"; // mutable so PickWorkspace is visible in dev
-  let workspaces = freshMock ? [] : ["~/projects/joyquant-db", "~/projects/joyquant-sys", "~/projects/realmlab", "~/projects/blade"];
+  let cwd = freshMock ? globalWorkspaceRoot : "~/projects/sample-app"; // mutable so PickWorkspace is visible in dev
+  let workspaces = freshMock ? [] : ["~/projects/sample-app", "~/projects/sample-services", "~/projects/realmlab", "~/projects/toolbox"];
   let mockEffort = "auto";
   const day = 86_400_000;
   const t0 = Date.now();
@@ -783,7 +784,7 @@ function makeMockApp(): AppBindings {
   };
   // Mutable so delete/rename are observable in browser dev.
   const sessions: SessionMeta[] = [
-    { path: "/mock/sessions/a.jsonl", preview: "fix the login bug in auth.go", turns: 12, createdAt: t0 - 2 * day, lastActivityAt: t0 - 3_600_000, modTime: t0 - 3_600_000, current: true, open: true },
+    { path: "/mock/sessions/a.jsonl", preview: "review the onboarding flow in app.tsx", turns: 12, createdAt: t0 - 2 * day, lastActivityAt: t0 - 3_600_000, modTime: t0 - 3_600_000, current: true, open: true },
     { path: "/mock/sessions/b.jsonl", preview: "refactor the payment module", turns: 5, createdAt: t0 - 3 * day, lastActivityAt: t0 - 6 * 3_600_000, modTime: t0 - 6 * 3_600_000, current: false, open: true },
     { path: "/mock/sessions/c.jsonl", preview: "write the README and badges", turns: 8, createdAt: t0 - 4 * day, lastActivityAt: t0 - day - 3_600_000, modTime: t0 - day - 3_600_000, current: false, open: false },
     { path: "/mock/sessions/d.jsonl", preview: "explain the plugin host design", turns: 3, createdAt: t0 - 5 * day, lastActivityAt: t0 - 4 * day, modTime: t0 - 4 * day, current: false, open: false },
@@ -801,7 +802,7 @@ function makeMockApp(): AppBindings {
       current: false,
       open: false,
       scope: "project",
-      workspaceRoot: "~/projects/joyquant-db",
+      workspaceRoot: "~/projects/sample-app",
       topicId: "topic_dev_standard",
       topicTitle: t("mock.trashDevStandardTitle"),
     },
@@ -817,7 +818,7 @@ function makeMockApp(): AppBindings {
       current: false,
       open: false,
       scope: "project",
-      workspaceRoot: "~/projects/joyquant-sys",
+      workspaceRoot: "~/projects/sample-services",
       topicId: "topic_p3a_pd",
       topicTitle: t("mock.trashP3aTitle"),
     },
@@ -1009,7 +1010,7 @@ function makeMockApp(): AppBindings {
     },
   };
   settings.providers = settings.providers.map((provider) =>
-    provider.apiKeyEnv === "DEEPSEEK_API_KEY" ? { ...provider, keySet: !freshMock } : provider,
+    provider.apiKeyEnv === "DEEPSEEK_API_KEY" ? { ...provider, keySet: false } : provider,
   );
   if (freshMock) {
     settings.configPath = "~/.config/realmlab/config.toml";
@@ -1017,30 +1018,30 @@ function makeMockApp(): AppBindings {
   const mockNow = Date.now();
   const mockProjectTree: ProjectNode[] = freshMock ? [] : [
     {
-      key: "project_~/projects/joyquant-db",
+      key: "project_~/projects/sample-app",
       kind: "project",
-      label: t("mock.projectJoyquantDb"),
-      root: "~/projects/joyquant-db",
+      label: t("mock.projectSampleApp"),
+      root: "~/projects/sample-app",
       projectColor: "blue",
       children: [
-        { key: "topic_dev_standard", kind: "topic", label: `● ${t("mock.topicDevStandard")}`, root: "~/projects/joyquant-db", topicId: "topic_dev_standard", projectColor: "blue", turns: 18, lastActivityAt: mockNow - 8 * 60_000, open: true, running: runningMock },
-        { key: "topic_db_maint", kind: "topic", label: t("mock.topicDbMaint"), root: "~/projects/joyquant-db", topicId: "topic_db_maint", projectColor: "blue", turns: 7, lastActivityAt: mockNow - 2 * 60 * 60_000 },
-        { key: "topic_env", kind: "topic", label: t("mock.topicEnv"), root: "~/projects/joyquant-db", topicId: "topic_env", projectColor: "blue", turns: 3, lastActivityAt: mockNow - 26 * 60 * 60_000 },
+        { key: "topic_dev_standard", kind: "topic", label: `● ${t("mock.topicDevStandard")}`, root: "~/projects/sample-app", topicId: "topic_dev_standard", projectColor: "blue", turns: 18, lastActivityAt: mockNow - 8 * 60_000, open: true, running: runningMock },
+        { key: "topic_db_maint", kind: "topic", label: t("mock.topicDbMaint"), root: "~/projects/sample-app", topicId: "topic_db_maint", projectColor: "blue", turns: 7, lastActivityAt: mockNow - 2 * 60 * 60_000 },
+        { key: "topic_env", kind: "topic", label: t("mock.topicEnv"), root: "~/projects/sample-app", topicId: "topic_env", projectColor: "blue", turns: 3, lastActivityAt: mockNow - 26 * 60 * 60_000 },
       ],
     },
     {
-      key: "project_~/projects/joyquant-sys",
+      key: "project_~/projects/sample-services",
       kind: "project",
-      label: t("mock.projectJoyquantSys"),
-      root: "~/projects/joyquant-sys",
+      label: t("mock.projectSampleServices"),
+      root: "~/projects/sample-services",
       projectColor: "purple",
       children: [
-        { key: "topic_p3b_pd", kind: "topic", label: `● ${t("mock.topicP3b")}`, root: "~/projects/joyquant-sys", topicId: "topic_p3b_pd", projectColor: "purple", turns: 11, lastActivityAt: mockNow - 3 * 24 * 60 * 60_000, status: runningMock ? "streaming" : undefined },
-        { key: "topic_p3a_pd", kind: "topic", label: t("mock.topicP3a"), root: "~/projects/joyquant-sys", topicId: "topic_p3a_pd", projectColor: "purple", turns: 9, lastActivityAt: mockNow - 4 * 24 * 60 * 60_000, status: runningMock ? "thinking" : undefined },
-        { key: "topic_hotfix", kind: "topic", label: t("mock.topicHotfix"), root: "~/projects/joyquant-sys", topicId: "topic_hotfix", projectColor: "purple", turns: 4, lastActivityAt: mockNow - 5 * 24 * 60 * 60_000, status: runningMock ? "thinking" : undefined },
-        { key: "topic_sys_coord", kind: "topic", label: t("mock.topicSysCoord"), root: "~/projects/joyquant-sys", topicId: "topic_sys_coord", projectColor: "purple", turns: 14, lastActivityAt: mockNow - 6 * 24 * 60 * 60_000, status: runningMock ? "waiting_confirmation" : undefined },
-        { key: "topic_sys_standard", kind: "topic", label: t("mock.topicSysStandard"), root: "~/projects/joyquant-sys", topicId: "topic_sys_standard", projectColor: "purple", turns: 6, lastActivityAt: mockNow - 7 * 24 * 60 * 60_000, status: "paused" },
-        { key: "topic_sys_exception", kind: "topic", label: t("mock.topicSysException"), root: "~/projects/joyquant-sys", topicId: "topic_sys_exception", projectColor: "purple", turns: 2, lastActivityAt: mockNow - 8 * 24 * 60 * 60_000, status: "error" },
+        { key: "topic_p3b_pd", kind: "topic", label: `● ${t("mock.topicP3b")}`, root: "~/projects/sample-services", topicId: "topic_p3b_pd", projectColor: "purple", turns: 11, lastActivityAt: mockNow - 3 * 24 * 60 * 60_000, status: runningMock ? "streaming" : undefined },
+        { key: "topic_p3a_pd", kind: "topic", label: t("mock.topicP3a"), root: "~/projects/sample-services", topicId: "topic_p3a_pd", projectColor: "purple", turns: 9, lastActivityAt: mockNow - 4 * 24 * 60 * 60_000, status: runningMock ? "thinking" : undefined },
+        { key: "topic_hotfix", kind: "topic", label: t("mock.topicHotfix"), root: "~/projects/sample-services", topicId: "topic_hotfix", projectColor: "purple", turns: 4, lastActivityAt: mockNow - 5 * 24 * 60 * 60_000, status: runningMock ? "thinking" : undefined },
+        { key: "topic_sys_coord", kind: "topic", label: t("mock.topicSysCoord"), root: "~/projects/sample-services", topicId: "topic_sys_coord", projectColor: "purple", turns: 14, lastActivityAt: mockNow - 6 * 24 * 60 * 60_000, status: runningMock ? "waiting_confirmation" : undefined },
+        { key: "topic_sys_standard", kind: "topic", label: t("mock.topicSysStandard"), root: "~/projects/sample-services", topicId: "topic_sys_standard", projectColor: "purple", turns: 6, lastActivityAt: mockNow - 7 * 24 * 60 * 60_000, status: "paused" },
+        { key: "topic_sys_exception", kind: "topic", label: t("mock.topicSysException"), root: "~/projects/sample-services", topicId: "topic_sys_exception", projectColor: "purple", turns: 2, lastActivityAt: mockNow - 8 * 24 * 60 * 60_000, status: "error" },
       ],
     },
     {
@@ -1233,7 +1234,7 @@ function makeMockApp(): AppBindings {
         ];
       case "topic_sys_coord":
         return [
-          { role: "user", content: "准备执行 joyquant-sys 的同步脚本，但需要我确认后再运行。" },
+          { role: "user", content: "准备执行 sample-services 的同步脚本，但需要我确认后再运行。" },
           { role: "assistant", content: "", reasoning: "这个动作会运行脚本并可能刷新本地缓存，所以需要先等用户确认。" },
         ];
       case "topic_sys_standard":
@@ -1246,7 +1247,7 @@ function makeMockApp(): AppBindings {
         return [
           { role: "user", content: "演练异常处理流程，看看失败时界面怎么提示。" },
           { role: "assistant", content: "我尝试校验恢复脚本时遇到异常，已停止继续执行。" },
-          { role: "notice", level: "warn", content: "运行异常：恢复脚本缺少必要环境变量 JOYQUANT_SYS_TOKEN。请补齐配置后重试。" },
+          { role: "notice", level: "warn", content: "运行异常：恢复脚本缺少必要环境变量 SAMPLE_SERVICES_TOKEN。请补齐配置后重试。" },
         ];
       default:
         return [];
@@ -1294,7 +1295,7 @@ function makeMockApp(): AppBindings {
             approval: {
               id: "mock-sys-confirm",
               tool: "bash",
-              subject: "npm run sync:joyquant-sys\n\n该命令会同步 SYS 项目配置并刷新本地缓存。",
+              subject: "npm run sync:sample-services\n\n该命令会同步示例服务配置并刷新本地缓存。",
             },
           });
         }
@@ -1338,11 +1339,11 @@ function makeMockApp(): AppBindings {
     },
   ] : [
     {
-      id: "tab_joyquant_db",
+      id: "tab_sample_app",
       scope: "project",
-      workspaceRoot: "~/projects/joyquant-db",
-      workspaceName: "joyquant-db",
-      workspacePath: "~/projects/joyquant-db",
+      workspaceRoot: "~/projects/sample-app",
+      workspaceName: "sample-app",
+      workspacePath: "~/projects/sample-app",
       gitBranch: "main",
       topicId: "topic_dev_standard",
       topicTitle: t("mock.trashDevStandardTitle"),
@@ -1355,14 +1356,14 @@ function makeMockApp(): AppBindings {
       toolApprovalMode: "ask",
       tokenMode: "full",
       active: true,
-      cwd: "~/projects/joyquant-db",
+      cwd: "~/projects/sample-app",
     },
     {
-      id: "tab_joyquant_sys",
+      id: "tab_sample_services",
       scope: "project",
-      workspaceRoot: "~/projects/joyquant-sys",
-      workspaceName: "joyquant-sys",
-      workspacePath: "~/projects/joyquant-sys",
+      workspaceRoot: "~/projects/sample-services",
+      workspaceName: "sample-services",
+      workspacePath: "~/projects/sample-services",
       gitBranch: "feature/p3b",
       topicId: "topic_p3b_pd",
       topicTitle: "p3b P&D",
@@ -1375,14 +1376,14 @@ function makeMockApp(): AppBindings {
       toolApprovalMode: "ask",
       tokenMode: "full",
       active: false,
-      cwd: "~/projects/joyquant-sys",
+      cwd: "~/projects/sample-services",
     },
     {
       id: "tab_global",
       scope: "global",
       workspaceRoot: "",
       workspaceName: "Global",
-      workspacePath: "~/projects/joyquant-db",
+      workspacePath: "~/projects/sample-app",
       topicId: "topic_global",
       topicTitle: "Global",
       label: "DeepSeek-R1",
@@ -1393,7 +1394,7 @@ function makeMockApp(): AppBindings {
       toolApprovalMode: "ask",
       tokenMode: "full",
       active: false,
-      cwd: "~/projects/joyquant-db",
+      cwd: "~/projects/sample-app",
     },
   ];
   const mockModelCatalog = [

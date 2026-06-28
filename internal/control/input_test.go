@@ -1018,7 +1018,7 @@ func TestIsSyntheticUserMessage(t *testing.T) {
 		},
 		{
 			name:  "user mentioning a summary is not synthetic",
-			input: "Summary of what I want: fix the login bug first.",
+			input: "Summary of what I want: review the onboarding flow first.",
 			want:  false,
 		},
 		{
