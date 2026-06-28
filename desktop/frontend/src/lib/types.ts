@@ -20,7 +20,8 @@ export type EventKind =
   | "mcp_surface_ready"
   | "retrying"
   | "steer"
-  | "memory_compiler_stats";
+  | "memory_compiler_stats"
+  | "guardian_assessment";
 
 export interface WireCompaction {
   trigger?: string; // "auto" | "manual"
@@ -86,6 +87,19 @@ export interface WireApproval {
   id: string;
   tool: string;
   subject: string;
+  reason?: string;
+}
+
+export interface WireGuardian {
+  id: string;
+  tool: string;
+  subject: string;
+  outcome: string;
+  risk_level?: string;
+  user_authorization?: string;
+  rationale?: string;
+  duration_ms?: number;
+  usage?: WireUsage;
 }
 
 export interface WireAskOption {
@@ -150,6 +164,7 @@ export interface WireEvent {
   approval?: WireApproval;
   ask?: WireAsk;
   compaction?: WireCompaction;
+  guardian?: WireGuardian;
   err?: string;
   retryAttempt?: number;
   retryMax?: number;
@@ -281,6 +296,7 @@ export interface HistoryMessage {
   role: string;
   content: string;
   submitText?: string;
+  checkpointTurn?: number;
   createdAt?: number;
   reasoning?: string;
   memoryCitations?: MemoryCitation[];
@@ -381,6 +397,10 @@ export interface ContextInfo {
   window: number;
   sessionTokens: number;
   compactRatio?: number;
+  sessionCost?: number;
+  sessionCurrency?: string;
+  cacheHitTokens?: number;
+  cacheMissTokens?: number;
 }
 
 export interface Meta {
@@ -393,6 +413,7 @@ export interface Meta {
   workspaceName?: string;
   workspacePath?: string;
   gitBranch?: string;
+  imageInputEnabled?: boolean;
   autoApproveTools?: boolean;
   bypass?: boolean; // legacy JSON key for YOLO/full-access tool auto-approval
   collaborationMode?: CollaborationMode;
@@ -414,9 +435,16 @@ export function normalizeCollaborationMode(mode?: string, goal?: string, legacyM
   return "normal";
 }
 
-export function normalizeToolApprovalMode(mode?: string, legacyMode?: Mode, legacyAutoApproveTools?: boolean): ToolApprovalMode {
-  if (mode === "auto" || mode === "yolo" || mode === "ask") return mode;
+export function normalizeToolApprovalMode(
+  mode?: string,
+  legacyMode?: Mode,
+  legacyAutoApproveTools?: boolean,
+  fallbackMode?: ToolApprovalMode,
+): ToolApprovalMode {
+  const normalized = typeof mode === "string" ? mode.trim().toLowerCase() : "";
+  if (normalized === "auto" || normalized === "yolo" || normalized === "ask") return normalized as ToolApprovalMode;
   if (legacyAutoApproveTools || (legacyMode && modeHasAutoApproveTools(legacyMode))) return "yolo";
+  if (fallbackMode === "auto" && normalized === "") return "auto";
   return "ask";
 }
 
@@ -468,13 +496,17 @@ export interface CommandInfo {
 
 export interface DirEntry {
   name: string;
+  path?: string;
   isDir: boolean;
+  displayName?: string;
+  displayPath?: string;
 }
 
 export interface DroppedItem {
   kind: "workspace" | "attachment";
   path: string;
   isDir?: boolean;
+  displayPath?: string;
   previewUrl?: string;
 }
 
@@ -547,6 +579,7 @@ export interface ServerView {
   resources: number;
   error?: string;
   toolList?: MCPToolView[];
+  trustedReadOnlyTools?: string[];
   authStatus?: "none" | "possible" | "required" | string;
   authUrl?: string;
   authConfigured?: boolean;
@@ -554,6 +587,7 @@ export interface ServerView {
 export interface MCPToolView {
   name: string;
   description: string;
+  readOnlyHint?: boolean;
 }
 export interface SkillView {
   name: string;
@@ -596,6 +630,7 @@ export interface MCPServerInput {
   url: string;
   env?: Record<string, string> | null;
   headers?: Record<string, string> | null;
+  trustedReadOnlyTools?: string[];
 }
 
 export interface ModelInfo {
@@ -944,6 +979,7 @@ export interface SettingsView {
   displayMode: string;   // "standard" | "compact"
   statusBarStyle: string; // "icon" | "text"
   statusBarItems: string[]; // ordered visible status bar item ids
+  defaultToolApprovalMode: ToolApprovalMode | string; // default for newly-created sessions
   checkUpdates: boolean; // check for new versions on startup
   telemetry: boolean; // anonymous launch ping (install id + version + OS)
   metrics: boolean; // aggregate desktop metrics (anonymous signal/bucket counts)

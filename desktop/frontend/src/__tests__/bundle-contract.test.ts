@@ -86,6 +86,10 @@ ok(
   "fresh browser mock never reports the packaged DeepSeek key as configured",
 );
 ok(
+  !/reasonix\/global-workspace|github\.com\/esengine\/reasonix\/releases|Scaffold a REASONIX\.md/.test(bridgeSource),
+  "browser fallback mock keeps RealmLab first-run copy and links",
+);
+ok(
   appSource.includes("app--mode-transition-stable") &&
     /app--mode-transition-stable \.composer-modebar__thumb[\s\S]*transition: none !important;[\s\S]*animation: none !important;/.test(stylesSource),
   "mode switches suppress transient chrome animations that can read as flicker",
