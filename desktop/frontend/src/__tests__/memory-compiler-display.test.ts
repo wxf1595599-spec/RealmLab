@@ -25,7 +25,7 @@ const contract = (sourceEvent: string) =>
 
 console.log("\nmemory compiler display strip");
 
-ok(stripMemoryCompilerExecution("fix the login bug") === "fix the login bug", "leaves plain user text untouched");
+ok(stripMemoryCompilerExecution("review the onboarding flow") === "review the onboarding flow", "leaves plain user text untouched");
 
 const complete = stripMemoryCompilerExecution(contract("do the thing"));
 ok(!complete.includes("memory-compiler-execution"), "removes a complete contract block");

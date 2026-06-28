@@ -121,9 +121,9 @@ eq(
   "plan approval must not preserve stale plan restore intent",
 );
 eq(
-  !appSource.includes("rememberUserIntent"),
+  !/applyCollaborationMode\([\s\S]*rememberUserIntent:\s*false/.test(appSource),
   true,
-  "collaboration mode changes always reconcile the remembered plan restore intent",
+  "collaboration mode changes do not skip remembered plan restore reconciliation",
 );
 
 const unsent = reducer(sent, { type: "unsend" });

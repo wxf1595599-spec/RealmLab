@@ -112,7 +112,7 @@ func TestSessionPreviewFromMessagesPreservesCompiledFirstTurn(t *testing.T) {
 func TestUserPreviewTextUnwrapsNestedCompilerContracts(t *testing.T) {
 	// Deeply accreted contract (a long goal loop re-compiled the echoed contract
 	// many times). Two unwrap passes are not enough for N levels.
-	deep := "fix the login bug"
+	deep := "review the onboarding flow"
 	for range 6 {
 		deep = mcContract(t, "follow-up step\n"+deep)
 	}
