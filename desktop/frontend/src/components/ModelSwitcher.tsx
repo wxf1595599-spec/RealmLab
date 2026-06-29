@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Check, ChevronsUpDown, Search } from "lucide-react";
+import { Check, ChevronsUpDown, Cpu, Search } from "lucide-react";
 import { asArray } from "../lib/array";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
@@ -99,7 +99,7 @@ export function ModelSwitcher({ label, tabId, onPick }: { label: string; tabId?:
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          <Brain size={13} className="modelsw__kind" />
+          <Cpu size={13} className="modelsw__kind" />
           <span className="modelsw__label">{label}</span>
           <ChevronsUpDown size={11} />
         </button>
@@ -131,7 +131,7 @@ export function ModelSwitcher({ label, tabId, onPick }: { label: string; tabId?:
           {models.length > 0 && filtered.length === 0 && query && <div className="modelsw__empty">{t("modelSwitcher.noMatches")}</div>}
           {groups.map((g) => (
             <div key={g.provider} role="group" aria-label={g.label} className="modelsw__group">
-              <div className="modelsw__group-label" role="presentation"><Brain size={11} />{g.label}</div>
+              <div className="modelsw__group-label" role="presentation"><Cpu size={11} />{g.label}</div>
               {g.items.map((m) => (
                 <button
                   key={m.ref}

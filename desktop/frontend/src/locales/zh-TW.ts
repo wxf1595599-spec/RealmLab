@@ -272,7 +272,8 @@ export const zhTW: Record<DictKey, string> = {
   "welcome.creation.bugBody": "把問題聊清楚。",
 
   // 輸入框
-  "composer.placeholder": "給 MicroRealm Lab 發訊息…  ( / 命令 · @ 檔案 )",
+  "composer.placeholder": "給 MicroRealm Lab 發訊息…",
+  "composer.ariaLabel": "給 MicroRealm Lab 發訊息。可用斜線開啟命令，@ 引用檔案，驚嘆號執行終端命令。",
   "composer.studentModePlaceholder": "想問什麼，直接說…",
   "composer.planMode": "計畫模式",
   "composer.planModeOn": "計畫模式已開",
@@ -1036,6 +1037,7 @@ export const zhTW: Record<DictKey, string> = {
   "updater.localVersion": "本地開發版（{v}）",
   "updater.disabled": "目前建置未啟用遠端更新檢查。",
   "updater.localDisabled": "本地開發版不連接遠端更新來源；正式發布後會使用 RealmLab 獨立更新渠道。",
+  "updater.manifestMissing": "RealmLab 更新清單尚未發布；發布包含 latest.json 的新版本後會自動恢復檢查。",
   "updater.channelLabel": "更新渠道：{channel}",
   "updater.checkButton": "檢查更新",
   "updater.checking": "正在檢查更新…",

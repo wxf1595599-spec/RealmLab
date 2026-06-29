@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -44,6 +45,9 @@ func (a *App) CheckUpdate() (*UpdateInfo, error) {
 	defer cancel()
 	m, err := fetchManifest(ctx, c)
 	if err != nil {
+		if errors.Is(err, errUpdateManifestMissing) {
+			return disabledUpdateInfo(updateDisabledReasonManifestMissing), nil
+		}
 		return &UpdateInfo{
 			Current:       version,
 			Channel:       channel,

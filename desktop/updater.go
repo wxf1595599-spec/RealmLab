@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,53 +34,52 @@ import (
 // has no Wails dependency so the logic is unit-tested directly; updater_app.go is
 // the thin Wails binding that wires these into App methods and progress events.
 
-// Manifest endpoints — R2 CDN first (fast, especially in CN), GitHub releases as
-// fallback. The build channel picks the rolling pointer so a canary build polls
-// the canary line and a stable build polls latest; the two never cross.
+// Manifest endpoints — RealmLab reads its own GitHub releases. The build channel
+// picks the rolling pointer so a canary build polls the canary line and a stable
+// build polls latest; the two never cross.
 const (
-	r2Base         = "https://dl.reasonix.io"
-	ghReleasesBase = "https://github.com/esengine/DeepSeek-Reasonix/releases"
+	ghReleasesBase = "https://github.com/wxf1595599-spec/RealmLab/releases"
 	httpTimeout    = 15 * time.Second
 )
 
-// manifestEndpoints returns the primary (R2) then fallback (GitHub) manifest URLs
-// for the running build's channel.
+const updateDisabledReasonManifestMissing = "manifest_missing"
+
+var errUpdateManifestMissing = errors.New("update manifest is not published")
+
+// manifestEndpoints returns the GitHub-hosted manifest URL for the running build's
+// channel. Stable releases use the latest release pointer; canary uses a rolling
+// release tag so it never shadows stable.
 func manifestEndpoints() []string {
 	if channel == "canary" {
-		// Canary publishes only to R2 (no GitHub release), so there is no
-		// GitHub fallback for this channel.
-		return []string{r2Base + "/canary/latest.json"}
+		return []string{ghReleasesBase + "/download/realmlab-canary/latest.json"}
 	}
-	return []string{
-		r2Base + "/latest/latest.json",
-		ghReleasesBase + "/latest/download/latest.json",
-	}
+	return []string{ghReleasesBase + "/latest/download/latest.json"}
 }
 
 // downloadPage is the human-facing releases page shown when self-update is
 // unavailable (macOS) or the manifest omits its own link.
 func downloadPage() string {
 	if channel == "canary" {
-		return ghReleasesBase // lists pre-releases too
+		return ghReleasesBase + "/tag/realmlab-canary"
 	}
 	return ghReleasesBase + "/latest"
 }
 
 // UpdateInfo is the CheckUpdate result that drives the frontend's update banner.
 type UpdateInfo struct {
-	Available     bool   `json:"available"`
-	Current       string `json:"current"`
-	Latest        string `json:"latest"`
-	Notes         string `json:"notes"`
-	Channel       string `json:"channel"`
-	CanSelfUpdate bool   `json:"canSelfUpdate"` // win/linux true; macOS true only for signed/notarized builds
-	ManualOnly    bool   `json:"manualOnly,omitempty"`
-	ManualReason  string `json:"manualReason,omitempty"`
+	Available      bool   `json:"available"`
+	Current        string `json:"current"`
+	Latest         string `json:"latest"`
+	Notes          string `json:"notes"`
+	Channel        string `json:"channel"`
+	CanSelfUpdate  bool   `json:"canSelfUpdate"` // win/linux true; macOS true only for signed/notarized builds
+	ManualOnly     bool   `json:"manualOnly,omitempty"`
+	ManualReason   string `json:"manualReason,omitempty"`
 	DisabledReason string `json:"disabledReason,omitempty"` // local builds do not poll remote feeds
-	Downloaded    bool   `json:"downloaded"`
-	DownloadURL   string `json:"downloadUrl"`   // human-facing releases page (macOS path / fallback link)
-	AssetSize     int64  `json:"assetSize"`     // running platform's artifact size, for the progress bar
-	Err           string `json:"err,omitempty"` // set when the check itself failed (both endpoints down)
+	Downloaded     bool   `json:"downloaded"`
+	DownloadURL    string `json:"downloadUrl"`   // human-facing releases page (macOS path / fallback link)
+	AssetSize      int64  `json:"assetSize"`     // running platform's artifact size, for the progress bar
+	Err            string `json:"err,omitempty"` // set when the check itself failed (both endpoints down)
 }
 
 // UpdateDownloadResult is returned after an artifact has been downloaded,
@@ -143,6 +143,7 @@ func disabledUpdateInfo(reason string) *UpdateInfo {
 		CanSelfUpdate:  false,
 		ManualOnly:     true,
 		DisabledReason: reason,
+		DownloadURL:    downloadPage(),
 	}
 }
 
@@ -163,22 +164,33 @@ func normalizeVersion(v string) (string, bool) {
 	return semver.Canonical(v), true
 }
 
-// fetchManifest pulls latest.json from the primary endpoint, then the fallback,
-// and decodes it.
+// fetchManifest pulls latest.json from the running channel endpoint and decodes it.
 func fetchManifest(ctx context.Context, c *http.Client) (*update.Manifest, error) {
+	return fetchManifestFromEndpoints(ctx, c, manifestEndpoints())
+}
+
+func fetchManifestFromEndpoints(ctx context.Context, c *http.Client, endpoints []string) (*update.Manifest, error) {
 	var lastErr error
-	for _, url := range manifestEndpoints() {
+	missingOnly := len(endpoints) > 0
+	for _, url := range endpoints {
 		b, err := fetchBytes(ctx, c, url)
 		if err != nil {
+			if !isHTTPStatus(err, http.StatusNotFound) {
+				missingOnly = false
+			}
 			lastErr = err
 			continue
 		}
+		missingOnly = false
 		var m update.Manifest
 		if err := json.Unmarshal(b, &m); err != nil {
 			lastErr = err
 			continue
 		}
 		return &m, nil
+	}
+	if missingOnly {
+		return nil, errUpdateManifestMissing
 	}
 	return nil, fmt.Errorf("update: fetch manifest: %w", lastErr)
 }
@@ -448,9 +460,24 @@ func fetchBytesOnce(ctx context.Context, c *http.Client, url string) ([]byte, er
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
+		return nil, httpStatusError{URL: url, StatusCode: resp.StatusCode, Status: resp.Status}
 	}
 	return io.ReadAll(resp.Body)
+}
+
+type httpStatusError struct {
+	URL        string
+	StatusCode int
+	Status     string
+}
+
+func (e httpStatusError) Error() string {
+	return fmt.Sprintf("GET %s: %s", e.URL, e.Status)
+}
+
+func isHTTPStatus(err error, code int) bool {
+	var statusErr httpStatusError
+	return errors.As(err, &statusErr) && statusErr.StatusCode == code
 }
 
 // download fetches url into memory, invoking onProgress as bytes arrive. A transient

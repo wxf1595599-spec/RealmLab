@@ -56,6 +56,11 @@ import { OnboardingOverlay } from "./components/OnboardingOverlay";
 import { AppChrome } from "./components/AppChrome";
 import { ShortcutsCheatsheet } from "./components/ShortcutsCheatsheet";
 import { ProjectTree } from "./components/ProjectTree";
+import {
+  StudentModeTransition,
+  STUDENT_MODE_TRANSITION_MS,
+  type StudentModeTransitionDirection,
+} from "./components/StudentModeTransition";
 import { HeartbeatPanel } from "./custom/features/heartbeat/HeartbeatPanel";
 import "./custom/features/heartbeat/heartbeat.css";
 import { CopyButton } from "./components/CopyButton";
@@ -940,6 +945,8 @@ export default function App() {
   const [sidebarTogglePressed, setSidebarTogglePressed] = useState(false);
   const [studentModeEnabled, setStudentModeEnabled] = useState(false);
   const [studentModeSyncing, setStudentModeSyncing] = useState(false);
+  const [studentModeTransition, setStudentModeTransition] = useState<StudentModeTransitionDirection | null>(null);
+  const studentModeTransitionTimerRef = useRef<number | null>(null);
   const [modeTransitionStable, setModeTransitionStable] = useState(false);
   const modeTransitionStableTimerRef = useRef<number | null>(null);
   const markModeTransitionStable = useCallback((durationMs = 180) => {
@@ -950,7 +957,26 @@ export default function App() {
       setModeTransitionStable(false);
     }, durationMs);
   }, []);
+  const startStudentModeTransition = useCallback((direction: StudentModeTransitionDirection, durationMs = STUDENT_MODE_TRANSITION_MS) => {
+    setStudentModeTransition(direction);
+    if (studentModeTransitionTimerRef.current !== null) window.clearTimeout(studentModeTransitionTimerRef.current);
+    studentModeTransitionTimerRef.current = window.setTimeout(() => {
+      studentModeTransitionTimerRef.current = null;
+      setStudentModeTransition(null);
+    }, durationMs);
+  }, []);
+  const clearStudentModeTransition = useCallback(() => {
+    if (studentModeTransitionTimerRef.current !== null) {
+      window.clearTimeout(studentModeTransitionTimerRef.current);
+      studentModeTransitionTimerRef.current = null;
+    }
+    setStudentModeTransition(null);
+  }, []);
   useEffect(() => () => {
+    if (studentModeTransitionTimerRef.current !== null) {
+      window.clearTimeout(studentModeTransitionTimerRef.current);
+      studentModeTransitionTimerRef.current = null;
+    }
     if (modeTransitionStableTimerRef.current !== null) {
       window.clearTimeout(modeTransitionStableTimerRef.current);
       modeTransitionStableTimerRef.current = null;
@@ -1392,6 +1418,7 @@ export default function App() {
       return;
     }
     const nextEnabled = !studentModeEnabled;
+    startStudentModeTransition(nextEnabled ? "to-student" : "to-normal");
     markModeTransitionStable(240);
     setStudentModeEnabled(nextEnabled);
     setStudentModeSyncing(true);
@@ -1402,13 +1429,14 @@ export default function App() {
       await applySkillModeProfileTransition(studentModeEnabled ? "student" : "normal", nextEnabled ? "student" : "normal");
     } catch (error) {
       console.warn("[student-mode] failed to sync skills", error);
+      clearStudentModeTransition();
       setStudentModeEnabled(studentModeEnabled);
       showToast(t("topicBar.studentModeSyncFailed"), "warn");
     } finally {
       markModeTransitionStable();
       setStudentModeSyncing(false);
     }
-  }, [controllerReady, markModeTransitionStable, showToast, studentModeEnabled, studentModeSwitchBlocked, studentModeSyncing, t]);
+  }, [clearStudentModeTransition, controllerReady, markModeTransitionStable, showToast, startStudentModeTransition, studentModeEnabled, studentModeSwitchBlocked, studentModeSyncing, t]);
   useEffect(() => {
     if (!activeTabId || !controllerReady) return;
     void app.SetStudentMode(studentModeEnabled).catch((error) => {
@@ -2797,11 +2825,14 @@ export default function App() {
         `app--${desktopPlatform}`,
         browserPreviewChrome ? "app--browser-preview" : "",
         modeTransitionStable ? "app--mode-transition-stable" : "",
+        studentModeTransition ? "app--student-mode-transition" : "",
+        studentModeTransition ? `app--student-mode-transition-${studentModeTransition}` : "",
         studentModeEnabled ? "app--student-mode" : "",
         sidebarWorkbench ? "app--workbench" : "",
         sidebarCreation ? "app--creation" : "",
       ].filter(Boolean).join(" ")}
     >
+      <StudentModeTransition direction={studentModeTransition} />
       <div
         ref={layoutRef}
         className={[
@@ -3207,6 +3238,7 @@ export default function App() {
                     "topicbar__action-btn--icon",
                     "topicbar__action-btn--student",
                     studentModeEnabled ? "topicbar__action-btn--student-active" : "",
+                    studentModeTransition ? "topicbar__action-btn--student-switching" : "",
                   ].filter(Boolean).join(" ")}
                   type="button"
                   aria-label={studentModeEnabled ? t("topicBar.studentModeOn") : t("topicBar.studentMode")}

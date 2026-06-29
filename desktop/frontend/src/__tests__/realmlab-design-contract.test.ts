@@ -78,6 +78,12 @@ for (const section of [
 }
 includes(design, "不要借题发挥", "DESIGN keeps the scoped-change rule explicit");
 includes(design, "新增样式必须局部 scope", "DESIGN locks scoped CSS maintenance");
+includes(design, "中心 MicroRealm symbol", "DESIGN locks the student mode transition direction");
+includes(design, "StudentModeTransition", "DESIGN names the independent student mode transition component");
+includes(design, "全屏独立转场层", "DESIGN locks the distinctive student mode page transition");
+includes(design, "登录/启动动画的视觉语言", "DESIGN anchors the student mode transition to the startup animation language");
+includes(design, "禁止仅做按钮附近小徽章", "DESIGN rejects button-only student mode transitions");
+includes(design, "全屏高透明彩色 wash/sheen", "DESIGN rejects dramatic student mode transitions");
 
 includes(agents, "docs/REALMLAB_SITE_BRIEF.md", "AGENTS requires the RealmLab site brief for site work");
 includes(siteBrief, "`site/` 是上游兼容 marketing surface", "site brief keeps site outside the desktop product core");
@@ -117,6 +123,9 @@ ok(/@container \(max-width: 430px\)[^@]*\.context-panel__usage-grid/s.test(style
 ok(!/:\s*"[^"\n]*(?:Reasonix|DeepSeek-Reasonix|Yolo|YOLO)[^"\n]*"/.test(localeSources), "locale values avoid user-visible Reasonix/Yolo wording");
 excludes(localeSources, "./reasonix.toml", "locale values avoid exposing the legacy project config filename");
 ok(/:\s*"[^"\n]*Soha[^"\n]*"/.test(localeSources), "locale values keep Soha as the visible approval label");
+ok(/"composer\.placeholder":\s*"给 MicroRealm Lab 发消息…"/.test(localeSources), "Chinese composer placeholder stays concise");
+ok(/"composer\.ariaLabel":\s*"[^"]*斜杠打开命令[^"]*@ 引用文件[^"]*终端命令/.test(localeSources), "composer aria label keeps shortcut affordances out of the placeholder");
+ok(!/"composer\.placeholder":\s*"[^"]*\([^"]*(?:命令|commands|檔案)/.test(localeSources), "composer placeholder avoids inline shortcut instructions");
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

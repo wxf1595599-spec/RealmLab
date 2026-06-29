@@ -125,8 +125,13 @@ function compactPath(path?: string, fallback?: string): string {
   return `…/${parts.slice(-2).join("/")}`;
 }
 
-function workspaceTooltip(t: Translator, displayPath: string, workspacePath?: string, gitBranch?: string) {
-  const workspace = (workspacePath || displayPath).trim();
+function workspaceDisplayLabel(path?: string, name?: string): string {
+  const cleanName = (name || "").trim();
+  return cleanName || compactPath(path, name);
+}
+
+function workspaceTooltip(t: Translator, displayLabel: string, workspacePath?: string, gitBranch?: string) {
+  const workspace = (workspacePath || displayLabel).trim();
   const branch = (gitBranch || "").trim();
   if (branch) {
     return (
@@ -137,6 +142,15 @@ function workspaceTooltip(t: Translator, displayPath: string, workspacePath?: st
     );
   }
   return `${t("status.workspaceTitle")}: ${workspace}`;
+}
+
+function workspaceTitleText(t: Translator, displayLabel: string, workspacePath?: string, gitBranch?: string): string {
+  const workspace = (workspacePath || displayLabel).trim();
+  const branch = (gitBranch || "").trim();
+  return [
+    workspace ? `${t("status.workspaceTitle")}: ${workspace}` : "",
+    branch ? `${t("status.gitBranchTitle")}: ${branch}` : "",
+  ].filter(Boolean).join(" · ");
 }
 
 export function StatusBar({
@@ -193,13 +207,19 @@ export function StatusBar({
   const turnCostLabel = formatMoneyLocalized(turnCost, currency, { locale });
   const costLabel = formatMoneyLocalized(cost, currency, { locale });
   const displayWorkspacePath = (workspacePath || workspaceName || "").trim();
-  const workspaceLabel = compactPath(displayWorkspacePath, workspaceName);
+  const workspaceLabel = workspaceDisplayLabel(displayWorkspacePath, workspaceName);
   const branchLabel = (gitBranch || "").trim();
-  const workspaceTitle = displayWorkspacePath ? workspaceTooltip(t, displayWorkspacePath, workspacePath, branchLabel) : "";
+  const workspaceTitle = displayWorkspacePath ? workspaceTooltip(t, workspaceLabel || displayWorkspacePath, workspacePath, branchLabel) : "";
+  const workspaceAriaLabel = displayWorkspacePath ? workspaceTitleText(t, workspaceLabel || displayWorkspacePath, workspacePath, branchLabel) : undefined;
   const turnLabel = formatTurnCount(sessionTurns, t);
   const tokenLabel = formatTokenCount(sessionTokens);
   const turnTokenLabel = formatTokenCount(turnTokens);
   const balanceLabel = balance?.available && balance.display ? balance.display : "-";
+  const hasSessionTokens = tokenLabel !== "-";
+  const hasSessionTurns = typeof sessionTurns === "number" && sessionTurns >= 0;
+  const hasSessionCost = typeof cost === "number" && cost > 0;
+  const hasTurnCost = typeof turnCost === "number" && turnCost > 0;
+  const hasContextUsage = pct !== null && pct > 0;
   const planMode = collaborationMode === "plan";
   const goalMode = collaborationMode === "goal";
   const metricLabelStyle = labelStyle === "text" ? "text" : "icon";
@@ -215,7 +235,7 @@ export function StatusBar({
     ),
     workspace: workspaceLabel ? (
       <Tooltip label={workspaceTitle} className="statusbar__metric statusbar__metric--workspace">
-        <span className="stat statusbar__workspace">
+        <span className="stat statusbar__workspace" aria-label={workspaceAriaLabel} title={workspaceAriaLabel}>
           <span className="stat__label stat__label--icon" aria-hidden="true"><Folder size={12} /></span>
           <b>{workspaceLabel}</b>
         </span>
@@ -229,63 +249,63 @@ export function StatusBar({
         </span>
       </Tooltip>
     ) : null,
-    cache: (
+    cache: nowPct !== null ? (
       <Tooltip label={t("status.cacheTitle")} className="statusbar__metric statusbar__metric--cache">
         <span className="stat statusbar__cache">
           <MetricLabel style={metricLabelStyle} icon={<Percent size={12} />} label={t("status.cacheLabel")} />
-          <b className={rateValueClass(nowPct) || undefined}>{nowPct !== null ? `${nowPct}%` : "-"}</b>
+          <b className={rateValueClass(nowPct) || undefined}>{`${nowPct}%`}</b>
         </span>
       </Tooltip>
-    ),
-    cache_avg: (
+    ) : null,
+    cache_avg: avgPct !== null ? (
       <Tooltip label={t("status.cacheAvgTitle")} className="statusbar__metric statusbar__metric--avg">
         <span className="stat statusbar__avg">
           <MetricLabel style={metricLabelStyle} icon={<Activity size={12} />} label={t("status.cacheAvgLabel")} />
-          <b className={rateValueClass(avgPct) || undefined}>{avgPct !== null ? `${avgPct}%` : "-"}</b>
+          <b className={rateValueClass(avgPct) || undefined}>{`${avgPct}%`}</b>
         </span>
       </Tooltip>
-    ),
-    session_tokens: (
+    ) : null,
+    session_tokens: hasSessionTokens ? (
       <Tooltip label={t("status.sessionTokensTitle")} className="statusbar__metric statusbar__metric--tokens">
         <span className="stat statusbar__tokens">
           <MetricLabel style={metricLabelStyle} icon={<Database size={12} />} label={t("status.sessionTokensLabel")} />
-          <b className={tokenLabel === "-" ? "stat__value--empty" : undefined}>{tokenLabel}</b>
+          <b>{tokenLabel}</b>
         </span>
       </Tooltip>
-    ),
-    turn_tokens: (
+    ) : null,
+    turn_tokens: turnTokenLabel !== "-" ? (
       <Tooltip label={t("status.turnTokensTitle")} className="statusbar__metric statusbar__metric--turn-tokens">
         <span className="stat statusbar__turn-tokens">
           <MetricLabel style={metricLabelStyle} icon={<Zap size={12} />} label={t("status.turnTokensLabel")} />
-          <b className={turnTokenLabel === "-" ? "stat__value--empty" : undefined}>{turnTokenLabel}</b>
+          <b>{turnTokenLabel}</b>
         </span>
       </Tooltip>
-    ),
-    turn_cost: (
+    ) : null,
+    turn_cost: hasTurnCost ? (
       <Tooltip label={t("status.turnCostTitle")} className="statusbar__metric statusbar__metric--turn-cost">
         <span className="stat statusbar__turn-cost">
           <MetricLabel style={metricLabelStyle} icon={<CircleDollarSign size={12} />} label={t("status.turnCostLabel")} />
           <b>{turnCostLabel}</b>
         </span>
       </Tooltip>
-    ),
-    session_turns: (
+    ) : null,
+    session_turns: hasSessionTurns ? (
       <Tooltip label={t("status.sessionTurnsTitle")} className="statusbar__metric statusbar__metric--turns">
         <span className="stat statusbar__turns">
           <MetricLabel style={metricLabelStyle} icon={<RefreshCw size={12} />} label={t("status.sessionTurnsLabel")} />
-          <b className={turnLabel === "-" ? "stat__value--empty" : undefined}>{turnLabel}</b>
+          <b>{turnLabel}</b>
         </span>
       </Tooltip>
-    ),
-    context: (
+    ) : null,
+    context: hasContextUsage ? (
       <Tooltip label={t("status.ctxTitle")} className="statusbar__metric statusbar__metric--ctx">
         <span className="stat statusbar__ctx">
           <MetricLabel style={metricLabelStyle} icon={<CircleGauge size={12} />} label={t("status.ctxLabel")} />
-          <b className={pct === null ? "stat__value--empty" : undefined}>{pct !== null ? `${pct}%` : "-"}</b>
+          <b>{`${pct}%`}</b>
         </span>
       </Tooltip>
-    ),
-    compact: (
+    ) : null,
+    compact: compactPct !== null ? (
       <Tooltip label={t("status.compactTitle")} className="statusbar__metric statusbar__metric--compact">
         <span className="stat statusbar__compact">
           <MetricLabel style={metricLabelStyle} icon={<Layers size={12} />} label={t("status.compactLabel")} />
@@ -295,31 +315,45 @@ export function StatusBar({
               compactReached ? "statusbar__compact-value--critical" : compactNear ? "statusbar__compact-value--warn" : undefined,
             ].filter(Boolean).join(" ") || undefined}
           >
-            {compactPct !== null ? `${compactPct}%` : "-"}
+            {`${compactPct}%`}
           </b>
         </span>
       </Tooltip>
-    ),
-    cost: (
+    ) : null,
+    cost: hasSessionCost ? (
       <Tooltip label={t("status.spendTitle")} className="statusbar__metric statusbar__metric--cost">
         <span className="stat statusbar__cost">
           <MetricLabel style={metricLabelStyle} icon={<CircleDollarSign size={12} />} label={t("status.costLabel")} />
           <b>{costLabel}</b>
         </span>
       </Tooltip>
-    ),
-    balance: (
+    ) : null,
+    balance: balanceLabel !== "-" ? (
       <Tooltip label={t("status.balanceTitle")} className="statusbar__metric statusbar__metric--balance">
         <span className="stat stat--balance statusbar__balance">
           <MetricLabel style={metricLabelStyle} icon={<Wallet size={12} />} label={t("status.balanceLabel")} />
-          <b className={balanceLabel === "-" ? "stat__value--empty" : undefined}>{balanceLabel}</b>
+          <b>{balanceLabel}</b>
         </span>
       </Tooltip>
-    ),
+    ) : null,
   };
   const renderedItems = visibleItems
     .map((id) => ({ id, node: itemRenderers[id] }))
     .filter(({ node }) => node !== null && node !== undefined && node !== false);
+  const renderedItemById = new Map(renderedItems.map((item) => [item.id, item.node]));
+  const statusSections: Array<{ key: string; className: string; ids: StatusBarItemId[] }> = [
+    { key: "environment", className: "statusbar__group--environment", ids: ["model", "workspace", "git_branch"] },
+    { key: "health", className: "statusbar__group--health", ids: ["cache", "cache_avg", "session_turns", "context", "compact"] },
+    { key: "usage", className: "statusbar__group--usage", ids: ["session_tokens", "turn_tokens", "turn_cost", "cost", "balance"] },
+  ];
+  const renderedSections = statusSections
+    .map((section) => {
+      const ids = visibleItems.filter((id) => section.ids.includes(id) && renderedItemById.has(id));
+      return { ...section, ids };
+    })
+    .filter((section) => section.ids.length > 0);
+  const usageSection = renderedSections.find((section) => section.key === "usage");
+  const leadingSections = renderedSections.filter((section) => section.key !== "usage");
   const modeIndicators = [
     planMode ? <span className="statusbar__plan" key="plan">{t("status.plan")}</span> : null,
     goalMode ? <span className="statusbar__plan" key="goal">{t("composer.goalMode")}</span> : null,
@@ -345,17 +379,28 @@ export function StatusBar({
           </span>
         </div>
       )}
-      <div className="statusbar__group statusbar__group--items">
-        {renderedItems.map(({ id, node }) => (
-          <span className="statusbar__item" data-statusbar-item={id} key={id}>
-            {node}
-          </span>
-        ))}
-      </div>
+      {leadingSections.map((section) => (
+        <div className={`statusbar__group statusbar__group--items ${section.className}`} key={section.key}>
+          {section.ids.map((id) => (
+            <span className="statusbar__item" data-statusbar-item={id} key={id}>
+              {renderedItemById.get(id)}
+            </span>
+          ))}
+        </div>
+      ))}
       {modeIndicators.length > 0 && <div className="statusbar__group statusbar__group--modes">{modeIndicators}</div>}
       {jobsList.length > 0 && (
         <div className="statusbar__group statusbar__group--jobs">
           <JobsChip jobs={jobsList} />
+        </div>
+      )}
+      {usageSection && (
+        <div className={`statusbar__group statusbar__group--items ${usageSection.className}`} key={usageSection.key}>
+          {usageSection.ids.map((id) => (
+            <span className="statusbar__item" data-statusbar-item={id} key={id}>
+              {renderedItemById.get(id)}
+            </span>
+          ))}
         </div>
       )}
     </div>

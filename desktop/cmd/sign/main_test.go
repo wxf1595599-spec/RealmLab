@@ -69,9 +69,9 @@ func TestGenManifest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv("GITHUB_REPOSITORY", "esengine/DeepSeek-Reasonix")
+	t.Setenv("GITHUB_REPOSITORY", "wxf1595599-spec/RealmLab")
 
-	if err := genManifest(dir, "v1.2.0", "desktop-v1.2.0"); err != nil {
+	if err := genManifest(dir, "v1.2.0", "realmlab-v1.2.0"); err != nil {
 		t.Fatalf("genManifest: %v", err)
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, "latest.json"))
@@ -92,7 +92,7 @@ func TestGenManifest(t *testing.T) {
 	if !ok {
 		t.Fatal("windows-amd64 missing")
 	}
-	wantURL := "https://github.com/esengine/DeepSeek-Reasonix/releases/download/desktop-v1.2.0/RealmLab-windows-amd64-installer.exe"
+	wantURL := "https://github.com/wxf1595599-spec/RealmLab/releases/download/realmlab-v1.2.0/RealmLab-windows-amd64-installer.exe"
 	if win.URL != wantURL {
 		t.Fatalf("windows url = %q, want %q", win.URL, wantURL)
 	}
