@@ -9,11 +9,11 @@ import (
 
 // publicKey is the minisign public key that desktop release artifacts are signed
 // with. The public half is safe to embed; the private half lives only in CI
-// secrets (generated with `cmd/sign genkey`). Key ID AF12CA46F4A9EBB0. If the
+// secrets (generated with `cmd/sign genkey`). Key ID 60446317A2D4465B. If the
 // signing key is ever rotated, regenerate and update this constant in lockstep
 // with the CI secret.
-const publicKey = `untrusted comment: minisign public key: AF12CA46F4A9EBB0
-RWSw66n0RsoSr6Zhh6qt5YO95YkpCayTOCMFVDNUQSjJYwxoYngNVBSq`
+const publicKey = `untrusted comment: minisign public key: 60446317A2D4465B
+RWRbRtSiF2NEYAIAN+Hw50BZd6fNnbNOUB5k50HWoPURXPPxWqBC9wMe`
 
 // Verify reports whether sig (the contents of a .minisig file) is a valid minisign
 // signature of data under the embedded public key. A nil return means the artifact
