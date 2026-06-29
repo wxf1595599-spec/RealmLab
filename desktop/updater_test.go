@@ -119,20 +119,54 @@ func TestChannelSelectsDistinctPointers(t *testing.T) {
 		if strings.Contains(u, "canary") {
 			t.Errorf("stable endpoint leaks into canary: %q", u)
 		}
+		if !strings.Contains(u, "github.com/wxf1595599-spec/RealmLab/releases") {
+			t.Errorf("stable endpoint should use the RealmLab GitHub repo, got %q", u)
+		}
+		if strings.Contains(u, "reasonix.io") || strings.Contains(u, "esengine/DeepSeek-Reasonix") {
+			t.Errorf("stable endpoint still uses the upstream update source: %q", u)
+		}
 	}
-	if !strings.Contains(stable[0], "/latest/latest.json") {
-		t.Errorf("stable primary = %q, want the latest/ pointer", stable[0])
+	if !strings.Contains(stable[0], "/latest/download/latest.json") {
+		t.Errorf("stable primary = %q, want GitHub latest/download latest.json", stable[0])
 	}
 	for _, u := range canary {
 		if strings.Contains(u, "/latest/") {
 			t.Errorf("canary endpoint hits the stable latest/ pointer: %q", u)
 		}
 	}
-	if !strings.Contains(canary[0], "/canary/latest.json") {
-		t.Errorf("canary primary = %q, want the canary/ pointer", canary[0])
+	if !strings.Contains(canary[0], "/download/realmlab-canary/latest.json") {
+		t.Errorf("canary primary = %q, want the RealmLab canary release pointer", canary[0])
 	}
 	if downloadPage() == (ghReleasesBase + "/latest") {
 		t.Error("canary download page should not be the stable latest releases page")
+	}
+}
+
+func TestMissingManifestDisablesUpdateCheckQuietly(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.NotFound(w, nil)
+	}))
+	defer srv.Close()
+
+	_, err := fetchManifestFromEndpoints(context.Background(), srv.Client(), []string{srv.URL + "/latest.json"})
+	if !errors.Is(err, errUpdateManifestMissing) {
+		t.Fatalf("fetchManifestFromEndpoints error = %v, want errUpdateManifestMissing", err)
+	}
+
+	origVersion := version
+	origChannel := channel
+	t.Cleanup(func() {
+		version = origVersion
+		channel = origChannel
+	})
+	version = "v1.0.2"
+	channel = "stable"
+	info := disabledUpdateInfo(updateDisabledReasonManifestMissing)
+	if info.Err != "" || info.Available || info.DisabledReason != updateDisabledReasonManifestMissing {
+		t.Fatalf("missing manifest update info = %+v, want quiet disabled state", info)
+	}
+	if info.DownloadURL != downloadPage() {
+		t.Fatalf("download URL = %q, want %q", info.DownloadURL, downloadPage())
 	}
 }
 
@@ -158,7 +192,7 @@ func TestSaveCachedUpdateMarksEvaluateDownloaded(t *testing.T) {
 
 	data := []byte("verified artifact")
 	asset := update.Asset{
-		URL:    "https://dl.reasonix.io/desktop-v9.9.9/RealmLab-linux-amd64.tar.gz",
+		URL:    "https://github.com/wxf1595599-spec/RealmLab/releases/download/realmlab-v9.9.9/RealmLab-linux-amd64.tar.gz",
 		Size:   int64(len(data)),
 		SHA256: sha256Hex(data),
 	}
@@ -189,7 +223,7 @@ func TestCachedUpdateRejectsTamperedArtifact(t *testing.T) {
 
 	data := []byte("verified artifact")
 	asset := update.Asset{
-		URL:    "https://dl.reasonix.io/desktop-v9.9.9/RealmLab-linux-amd64.tar.gz",
+		URL:    "https://github.com/wxf1595599-spec/RealmLab/releases/download/realmlab-v9.9.9/RealmLab-linux-amd64.tar.gz",
 		Size:   int64(len(data)),
 		SHA256: sha256Hex(data),
 	}
@@ -216,7 +250,7 @@ func TestCachedUpdateRejectsDifferentChannel(t *testing.T) {
 
 	data := []byte("verified artifact")
 	asset := update.Asset{
-		URL:    "https://dl.reasonix.io/desktop-v9.9.9/RealmLab-linux-amd64.tar.gz",
+		URL:    "https://github.com/wxf1595599-spec/RealmLab/releases/download/realmlab-v9.9.9/RealmLab-linux-amd64.tar.gz",
 		Size:   int64(len(data)),
 		SHA256: sha256Hex(data),
 	}

@@ -128,8 +128,8 @@ corepack pnpm --dir desktop/frontend exec tsx src/__tests__/realmlab-design-cont
 Build desktop packages:
 
 ```sh
-scripts/desktop-build.sh darwin/universal v0.1.0 stable
-scripts/desktop-build.sh windows/amd64 v0.1.0 stable
+scripts/desktop-build.sh darwin/universal v1.0.2 stable
+scripts/desktop-build.sh windows/amd64 v1.0.2 stable
 ```
 
 ### Repository Map
@@ -140,7 +140,7 @@ scripts/desktop-build.sh windows/amd64 v0.1.0 stable
 | `desktop/frontend/` | React UI, design system, desktop tests |
 | `internal/` | Agent runtime, tools, providers, sessions, permissions |
 | `docs/` | Product, release, QA, and engineering notes |
-| `.github/workflows/publish-installers.yml` | Cross-platform installer publishing |
+| `.github/workflows/release-desktop.yml` | Cross-platform installer publishing and GitHub update manifest |
 
 ### Verification
 
@@ -261,8 +261,8 @@ corepack pnpm --dir desktop/frontend exec tsx src/__tests__/realmlab-design-cont
 构建桌面安装包：
 
 ```sh
-scripts/desktop-build.sh darwin/universal v0.1.0 stable
-scripts/desktop-build.sh windows/amd64 v0.1.0 stable
+scripts/desktop-build.sh darwin/universal v1.0.2 stable
+scripts/desktop-build.sh windows/amd64 v1.0.2 stable
 ```
 
 ### 仓库结构
@@ -273,7 +273,7 @@ scripts/desktop-build.sh windows/amd64 v0.1.0 stable
 | `desktop/frontend/` | React UI、设计系统、桌面端测试 |
 | `internal/` | 智能体运行时、工具、provider、会话、权限 |
 | `docs/` | 产品、发布、QA 和工程说明 |
-| `.github/workflows/publish-installers.yml` | 跨平台安装包发布 |
+| `.github/workflows/release-desktop.yml` | 跨平台安装包发布与 GitHub 更新清单 |
 
 ### 发布前检查
 

@@ -363,7 +363,8 @@ export const zh: Record<DictKey, string> = {
   "welcome.creation.bugBody": "把问题聊清楚。",
 
   // 输入框
-  "composer.placeholder": "给 MicroRealm Lab 发消息…  ( / 命令 · @ 文件 · ! 终端 )",
+  "composer.placeholder": "给 MicroRealm Lab 发消息…",
+  "composer.ariaLabel": "给 MicroRealm Lab 发消息。可用斜杠打开命令，@ 引用文件，感叹号运行终端命令。",
   "composer.studentModePlaceholder": "想问啥，直接说…",
   "composer.normalMode": "对话模式",
   "composer.normalModeDesc": "直接对话或执行任务。",
@@ -1611,6 +1612,7 @@ export const zh: Record<DictKey, string> = {
   "updater.localVersion": "本地开发版（{v}）",
   "updater.disabled": "当前构建未启用远程更新检查。",
   "updater.localDisabled": "本地开发版不连接远程更新源；正式发布后会使用 RealmLab 独立更新渠道。",
+  "updater.manifestMissing": "RealmLab 更新清单尚未发布；发布包含 latest.json 的新版本后会自动恢复检查。",
   "updater.channelLabel": "更新渠道：{channel}",
   "updater.checkButton": "检查更新",
   "updater.checking": "正在检查更新…",

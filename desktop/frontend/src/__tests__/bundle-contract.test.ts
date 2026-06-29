@@ -20,6 +20,8 @@ function ok(cond: boolean, label: string) {
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../../..");
 const appSource = readFileSync(resolve(here, "../App.tsx"), "utf8");
+const composerSource = readFileSync(resolve(here, "../components/Composer.tsx"), "utf8");
+const modelSwitcherSource = readFileSync(resolve(here, "../components/ModelSwitcher.tsx"), "utf8");
 const settingsSource = readFileSync(resolve(here, "../components/SettingsPanel.tsx"), "utf8");
 const markdownSource = readFileSync(resolve(here, "../components/Markdown.tsx"), "utf8");
 const bridgeSource = readFileSync(resolve(here, "../lib/bridge.ts"), "utf8");
@@ -31,6 +33,9 @@ const localeSource = [
 const stylesSource = readFileSync(resolve(here, "../styles.css"), "utf8");
 const wailsConfig = readFileSync(resolve(repoRoot, "desktop/wails.json"), "utf8");
 const publishInstallersWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/publish-installers.yml"), "utf8");
+const releaseDesktopWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/release-desktop.yml"), "utf8");
+const updaterSource = readFileSync(resolve(repoRoot, "desktop/updater.go"), "utf8");
+const signSource = readFileSync(resolve(repoRoot, "desktop/cmd/sign/main.go"), "utf8");
 
 console.log("\nbundle contract");
 
@@ -100,16 +105,63 @@ ok(
 );
 ok(
   appSource.includes("app--mode-transition-stable") &&
-    /app--mode-transition-stable(?::not\(\.app--student-mode-transition\))? \.composer-modebar__thumb[\s\S]*transition: none !important;[\s\S]*animation: none !important;/.test(stylesSource),
+    /app--mode-transition-stable(?::not\(\.app--student-mode-transition\))? \.composer-card[\s\S]*transition: none !important;[\s\S]*animation: none !important;[\s\S]*transform: none !important;/.test(stylesSource),
   "mode switches suppress transient chrome animations that can read as flicker",
+);
+ok(
+  /app--mode-transition-stable(?::not\(\.app--student-mode-transition\))? \.composer-modebar__item[\s\S]*transition: none !important;[\s\S]*animation: none !important;[\s\S]*transform: none !important;/.test(stylesSource),
+  "mode switches also freeze composer mode labels and icons",
+);
+ok(
+  !/app--mode-transition-stable(?::not\(\.app--student-mode-transition\))? \.composer-modebar__thumb\s*\{[\s\S]*?(?:transition|transform):\s*none !important;/.test(stylesSource),
+  "mode switches leave the approval thumb free to slide from the current mode",
+);
+ok(
+  composerSource.includes("pendingApprovalModeRef") &&
+    composerSource.includes("setDisplayApprovalMode(nextDisplayApprovalMode)") &&
+    composerSource.includes('data-mode={displayApprovalMode}') &&
+    composerSource.includes('"--composer-modebar-index": approvalModebarIndex(displayApprovalMode, studentModeEnabled)'),
+  "approval modebar uses an optimistic display state and stable index during backend refresh",
+);
+ok(
+  composerSource.includes("function RealmIceCubeIcon") &&
+    composerSource.includes("<RealmIceCubeIcon size={15} />") &&
+    stylesSource.includes(".composer-modebar__realm-cube-icon") &&
+    !/ShieldCheck|realm-auto-icon/.test(`${composerSource}\n${stylesSource}`),
+  "auto approval mode uses the restored compact RealmLab ice-cube icon",
 );
 ok(
   !/(?:Reasonix|DeepSeek-Reasonix|resonix)/i.test(wailsConfig),
   "desktop installer metadata stays under the RealmLab identity",
 );
 ok(
+  wailsConfig.includes('"productVersion": "1.0.2"'),
+  "desktop installer metadata uses the unified RealmLab v1.0.2 product version",
+);
+ok(
+  updaterSource.includes("github.com/wxf1595599-spec/RealmLab/releases") &&
+    !/dl\.reasonix\.io|github\.com\/esengine\/DeepSeek-Reasonix\/releases/.test(updaterSource),
+  "desktop updater checks the RealmLab GitHub release channel, not the upstream release feed",
+);
+ok(
+  signSource.includes('repo = "wxf1595599-spec/RealmLab"') &&
+    releaseDesktopWorkflow.includes('tags: ["realmlab-v*"]') &&
+    !/desktop-v\*|dl\.reasonix\.io|R2_PUBLIC_BASE|DeepSeek-Reasonix/.test(releaseDesktopWorkflow),
+  "release manifest and workflow publish the RealmLab update channel",
+);
+ok(
+  settingsSource.includes('case "manifest_missing"') &&
+    localeSource.includes("updater.manifestMissing"),
+  "missing update manifests use a quiet RealmLab-specific disabled state",
+);
+ok(
   !publishInstallersWorkflow.includes("DEEPSEEK_API_KEY"),
   "installer publishing workflow does not receive or package the DeepSeek key",
+);
+ok(
+  modelSwitcherSource.includes('<Cpu size={13} className="modelsw__kind" />') &&
+    !/\bBrain\b|ModelChipIcon|modelsw__model-chip-icon|model-chip-icon/.test(`${modelSwitcherSource}\n${stylesSource}`),
+  "model switcher uses the restored small chip icon instead of brain or custom chip art",
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -96,21 +96,21 @@ checkout). A bare `go build` without a prior `pnpm build` produces a blank windo
 
 ## Releases & auto-update
 
-Desktop releases ride their own tag namespace, `desktop-v<semver>` (plain `v*`
-tags are the CLI release). Pushing one triggers `.github/workflows/release-desktop.yml`,
-which builds on a native runner per platform (Wails can't cross-compile a
-CGO/WebKit binary), packages each artifact, signs it with minisign, generates a
-`latest.json` manifest, publishes a GitHub release, and mirrors everything to R2.
+Desktop releases ride their own tag namespace, `realmlab-v<semver>`. Pushing one
+triggers `.github/workflows/release-desktop.yml`, which builds on a native runner
+per platform (Wails can't cross-compile a CGO/WebKit binary), packages each
+artifact, signs it with minisign, generates a `latest.json` manifest, and
+publishes a GitHub release in the RealmLab repository.
 The Linux artifact links against WebKitGTK 4.1 (`-tags webkit2_41`), so it needs
 `libwebkit2gtk-4.1-0` at runtime — present by default on Ubuntu 22.04+, Fedora 40+.
 
 ```sh
-git tag desktop-v1.1.0 && git push origin desktop-v1.1.0
+git tag realmlab-v1.0.2 && git push github-new realmlab-v1.0.2
 ```
 
-The app checks `latest.json` on startup (R2 first, GitHub as fallback) and shows
-an update banner when a newer version is published; **Settings → Software update**
-has a manual check. Self-update behavior by platform:
+The app checks the GitHub-hosted `latest.json` on startup and shows an update
+banner when a newer version is published; **Settings → Software update** has a
+manual check. Self-update behavior by platform:
 
 - **Linux / Windows** — download, verify the minisign signature, then update in
   place: Linux replaces the binary and relaunches; Windows runs the per-user NSIS

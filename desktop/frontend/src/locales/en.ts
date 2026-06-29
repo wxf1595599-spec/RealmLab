@@ -362,7 +362,8 @@ export const en = {
   "welcome.creation.bugBody": "Make the question clear.",
 
   // composer
-  "composer.placeholder": "Message MicroRealm Lab…  ( / commands · @ files · ! shell )",
+  "composer.placeholder": "Message MicroRealm Lab…",
+  "composer.ariaLabel": "Message MicroRealm Lab. Use slash for commands, at-sign to reference files, and exclamation mark for shell commands.",
   "composer.studentModePlaceholder": "Ask anything…",
   "composer.normalMode": "chat mode",
   "composer.normalModeDesc": "Answer or work directly.",
@@ -1609,6 +1610,7 @@ export const en = {
   "updater.localVersion": "Local development build ({v})",
   "updater.disabled": "Remote update checks are not enabled for this build.",
   "updater.localDisabled": "Local development builds do not connect to remote update feeds. Official releases will use RealmLab's own update channel.",
+  "updater.manifestMissing": "The RealmLab update manifest has not been published yet. Checks will resume after a release includes latest.json.",
   "updater.channelLabel": "Update channel: {channel}",
   "updater.checkButton": "Check for updates",
   "updater.checking": "Checking for updates…",

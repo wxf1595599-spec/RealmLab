@@ -12,8 +12,7 @@
 //
 //	manifest <dir> <ver> <tag>   Scan <dir> for the per-platform artifacts, compute
 //	                             size + sha256, and write <dir>/latest.json with GitHub
-//	                             release download URLs. The R2 mirror step rewrites those
-//	                             URLs to the CDN afterwards (url + sig fields together).
+//	                             release download URLs for the RealmLab GitHub release.
 package main
 
 import (
@@ -163,11 +162,11 @@ func signFiles(files []string) error {
 
 // genManifest scans dir for the per-platform artifacts and writes dir/latest.json.
 // version is the semver compared by the updater (e.g. "v1.1.0"); tag is the GitHub
-// release tag used in download URLs (e.g. "desktop-v1.1.0").
+// release tag used in download URLs (e.g. "realmlab-v1.1.0").
 func genManifest(dir, version, tag string) error {
 	repo := os.Getenv("GITHUB_REPOSITORY")
 	if repo == "" {
-		repo = "esengine/DeepSeek-Reasonix"
+		repo = "wxf1595599-spec/RealmLab"
 	}
 	m := update.Manifest{
 		Version:      version,

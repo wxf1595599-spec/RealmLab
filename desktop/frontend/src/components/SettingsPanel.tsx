@@ -69,7 +69,14 @@ function formatUpdateVersion(version: string, t: Translator): string {
 }
 
 function formatUpdateDisabledReason(reason: string, t: Translator): string {
-  return reason === "local" ? t("updater.localDisabled") : t("updater.disabled");
+  switch (reason) {
+    case "local":
+      return t("updater.localDisabled");
+    case "manifest_missing":
+      return t("updater.manifestMissing");
+    default:
+      return t("updater.disabled");
+  }
 }
 
 const MCPServersSettingsPage = lazy(() => import("./CapabilitiesPanel").then((module) => ({ default: module.MCPServersSettingsPage })));

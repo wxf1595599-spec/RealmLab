@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Eye, FileText, Folder, Gauge, List, MessageSquare, Mic, Search, Shield, ShieldAlert, ShieldCheck, SlidersHorizontal, Square, Target, Trash2, X } from "lucide-react";
+import { ArrowUp, Eye, FileText, Folder, Gauge, List, MessageSquare, Mic, Search, Shield, ShieldAlert, SlidersHorizontal, Square, Target, Trash2, X } from "lucide-react";
 import { asArray } from "../lib/array";
 import { filterAtMatches } from "../lib/atMatches";
 import { DedupIndex, sha256 } from "../lib/attachDedup";
@@ -58,6 +58,74 @@ const PROMPT_HISTORY_PREFETCH_REMAINING = 3;
 // it; the real gap is a few ms, so keep it short or a deliberate quick second
 // Enter (submit) gets eaten too.
 const IME_CONFIRM_GRACE_MS = 100;
+const APPROVAL_MODEBAR_CONFIRM_TIMEOUT_MS = 1200;
+
+function RealmIceCubeIcon({ size = 15 }: { size?: number }) {
+  const id = useId().replace(/:/g, "");
+  const rimId = `realm-cube-rim-${id}`;
+  const topId = `realm-cube-top-${id}`;
+  const leftId = `realm-cube-left-${id}`;
+  const rightId = `realm-cube-right-${id}`;
+  const glowId = `realm-cube-glow-${id}`;
+
+  return (
+    <svg
+      className="composer-modebar__realm-cube-icon"
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <linearGradient id={rimId} x1="3.1" y1="2.1" x2="14.9" y2="15.9" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#f6f9ff" />
+          <stop offset="0.36" stopColor="#b9ceff" />
+          <stop offset="0.74" stopColor="#4b7fff" />
+          <stop offset="1" stopColor="#2559df" />
+        </linearGradient>
+        <linearGradient id={topId} x1="5.3" y1="2.1" x2="12.9" y2="8.4" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#f7fbff" />
+          <stop offset="0.54" stopColor="#c9d9ff" />
+          <stop offset="1" stopColor="#7aa4ff" />
+        </linearGradient>
+        <linearGradient id={leftId} x1="3.7" y1="5.1" x2="9.2" y2="15.9" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#e9f3ff" stopOpacity="0.88" />
+          <stop offset="1" stopColor="#608fff" stopOpacity="0.72" />
+        </linearGradient>
+        <linearGradient id={rightId} x1="14.6" y1="5.2" x2="8.8" y2="15.9" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#7ea6ff" stopOpacity="0.92" />
+          <stop offset="1" stopColor="#245ce7" stopOpacity="0.88" />
+        </linearGradient>
+        <radialGradient id={glowId} cx="0" cy="0" r="1" gradientTransform="matrix(4.7 0 0 4.2 9 9.5)" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.28" stopColor="#f7fbff" stopOpacity="0.72" />
+          <stop offset="0.72" stopColor="#4a7eff" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#245ce7" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <path className="realm-cube-icon__halo" d="M9 0.9 16.05 4.98v8.04L9 17.1l-7.05-4.08V4.98L9 0.9Z" />
+      <path className="realm-cube-icon__facet realm-cube-icon__facet--top" d="M9 1.18 15.55 4.96 9 8.76 2.45 4.96 9 1.18Z" fill={`url(#${topId})`} />
+      <path className="realm-cube-icon__facet realm-cube-icon__facet--left" d="M2.45 4.96 9 8.76v7.58l-6.55-3.82V4.96Z" fill={`url(#${leftId})`} />
+      <path className="realm-cube-icon__facet realm-cube-icon__facet--right" d="M15.55 4.96 9 8.76v7.58l6.55-3.82V4.96Z" fill={`url(#${rightId})`} />
+      <path className="realm-cube-icon__glow" d="M9 4.75c2.56 0 4.65 1.98 4.65 4.42S11.56 13.6 9 13.6s-4.65-1.98-4.65-4.43S6.44 4.75 9 4.75Z" fill={`url(#${glowId})`} />
+      <path className="realm-cube-icon__rim" d="M9 1.18 15.55 4.96v7.56L9 16.34l-6.55-3.82V4.96L9 1.18Z" stroke={`url(#${rimId})`} />
+      <path className="realm-cube-icon__edge" d="M9 8.76v7.58M2.45 4.96 9 8.76l6.55-3.8" />
+      <path className="realm-cube-icon__mark" d="m7.32 7.92-1.34 1.36 1.34 1.36M10.68 7.92l1.34 1.36-1.34 1.36M9.52 7.78l-1.04 3" />
+    </svg>
+  );
+}
+
+function approvalModebarDisplayMode(mode: ToolApprovalMode, studentModeEnabled: boolean): ToolApprovalMode {
+  return studentModeEnabled ? (mode === "yolo" ? "yolo" : "ask") : mode;
+}
+
+function approvalModebarIndex(mode: ToolApprovalMode, studentModeEnabled: boolean): number {
+  if (studentModeEnabled) return mode === "yolo" ? 1 : 0;
+  if (mode === "auto") return 1;
+  if (mode === "yolo") return 2;
+  return 0;
+}
 
 type PastedBlock = {
   label: string;
@@ -2187,8 +2255,49 @@ export function Composer({
     : undefined;
   const composerAutoExpanded = composerHeight === null && textareaAutoHeight !== null && textareaAutoHeight > 40;
   const composerResizeValue = composerHeight ?? clampComposerHeight((textareaAutoHeight ?? 0) + COMPOSER_AUTO_RESERVED_HEIGHT);
+  const resolvedApprovalMode = approvalModebarDisplayMode(toolApprovalMode, studentModeEnabled);
+  const resolvedApprovalModeRef = useRef<ToolApprovalMode>(resolvedApprovalMode);
+  const pendingApprovalModeRef = useRef<ToolApprovalMode | null>(null);
+  const pendingApprovalModeTimeoutRef = useRef<number | null>(null);
+  const [displayApprovalMode, setDisplayApprovalMode] = useState<ToolApprovalMode>(resolvedApprovalMode);
+  const approvalModebarStyle = useMemo(
+    () => ({
+      "--composer-modebar-index": approvalModebarIndex(displayApprovalMode, studentModeEnabled),
+    }) as CSSProperties,
+    [displayApprovalMode, studentModeEnabled],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (pendingApprovalModeTimeoutRef.current !== null) {
+        window.clearTimeout(pendingApprovalModeTimeoutRef.current);
+        pendingApprovalModeTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    resolvedApprovalModeRef.current = resolvedApprovalMode;
+    if (pendingApprovalModeRef.current && resolvedApprovalMode !== pendingApprovalModeRef.current) return;
+    pendingApprovalModeRef.current = null;
+    if (pendingApprovalModeTimeoutRef.current !== null) {
+      window.clearTimeout(pendingApprovalModeTimeoutRef.current);
+      pendingApprovalModeTimeoutRef.current = null;
+    }
+    setDisplayApprovalMode(resolvedApprovalMode);
+  }, [resolvedApprovalMode]);
+
   void onSetMode;
   const chooseApprovalMode = (nextMode: ToolApprovalMode) => {
+    const nextDisplayApprovalMode = approvalModebarDisplayMode(nextMode, studentModeEnabled);
+    pendingApprovalModeRef.current = nextDisplayApprovalMode;
+    setDisplayApprovalMode(nextDisplayApprovalMode);
+    if (pendingApprovalModeTimeoutRef.current !== null) window.clearTimeout(pendingApprovalModeTimeoutRef.current);
+    pendingApprovalModeTimeoutRef.current = window.setTimeout(() => {
+      pendingApprovalModeTimeoutRef.current = null;
+      pendingApprovalModeRef.current = null;
+      setDisplayApprovalMode(resolvedApprovalModeRef.current);
+    }, APPROVAL_MODEBAR_CONFIRM_TIMEOUT_MS);
     onSetToolApprovalMode(nextMode);
     requestAnimationFrame(() => taRef.current?.focus());
   };
@@ -2220,7 +2329,6 @@ export function Composer({
   const effortLevels = asArray(effort?.levels);
   const currentEffort = effort?.current || "auto";
   const hasEffort = Boolean(effort?.supported && effortLevels.length > 0);
-  const studentApprovalMode = studentModeEnabled ? (toolApprovalMode === "yolo" ? "yolo" : "ask") : toolApprovalMode;
   useEffect(() => {
     if (!studentModeEnabled || !hasEffort || currentEffort === "auto") return;
     onSetEffort("auto");
@@ -2598,7 +2706,7 @@ export function Composer({
             id="composer-input"
             ref={taRef}
             className="composer__input"
-            aria-label={studentModeEnabled ? t("composer.studentModePlaceholder") : t("composer.placeholder")}
+            aria-label={studentModeEnabled ? t("composer.studentModePlaceholder") : t("composer.ariaLabel")}
             value={text}
             onChange={(e) => {
               resetPromptHistoryNavigation();
@@ -2751,16 +2859,17 @@ export function Composer({
             <div className="composer-meta__control composer-meta__control--approval">
               <div
                 className={`composer-modebar composer-modebar--approval${studentModeEnabled ? " composer-modebar--student" : ""}`}
-                data-mode={studentApprovalMode}
+                data-mode={displayApprovalMode}
+                style={approvalModebarStyle}
                 title={t("composer.accessMenuTitle")}
               >
                 <span className="composer-modebar__thumb" aria-hidden="true" />
                 <button
                   type="button"
-                  className={`composer-modebar__item composer-modebar__item--ask${studentApprovalMode === "ask" ? " composer-modebar__item--active" : ""}`}
+                  className={`composer-modebar__item composer-modebar__item--ask${displayApprovalMode === "ask" ? " composer-modebar__item--active" : ""}`}
                   onClick={() => chooseApprovalMode("ask")}
                   disabled={disabled}
-                  aria-pressed={studentApprovalMode === "ask"}
+                  aria-pressed={displayApprovalMode === "ask"}
                   title={t("composer.accessAskTitle")}
                 >
                   <Shield size={14} />
@@ -2769,22 +2878,22 @@ export function Composer({
                 {!studentModeEnabled && (
                   <button
                     type="button"
-                    className={`composer-modebar__item composer-modebar__item--auto${toolApprovalMode === "auto" ? " composer-modebar__item--active" : ""}`}
+                    className={`composer-modebar__item composer-modebar__item--auto${displayApprovalMode === "auto" ? " composer-modebar__item--active" : ""}`}
                     onClick={() => chooseApprovalMode("auto")}
                     disabled={disabled}
-                    aria-pressed={toolApprovalMode === "auto"}
+                    aria-pressed={displayApprovalMode === "auto"}
                     title={t("composer.accessAutoTitle")}
                   >
-                    <ShieldCheck size={14} />
+                    <RealmIceCubeIcon size={15} />
                     <span>{t("composer.modeNormal")}</span>
                   </button>
                 )}
                 <button
                   type="button"
-                  className={`composer-modebar__item composer-modebar__item--yolo${studentApprovalMode === "yolo" ? " composer-modebar__item--active" : ""}`}
+                  className={`composer-modebar__item composer-modebar__item--yolo${displayApprovalMode === "yolo" ? " composer-modebar__item--active" : ""}`}
                   onClick={() => chooseApprovalMode("yolo")}
                   disabled={disabled}
-                  aria-pressed={studentApprovalMode === "yolo"}
+                  aria-pressed={displayApprovalMode === "yolo"}
                   title={t("composer.accessYoloTitle")}
                 >
                   <ShieldAlert size={14} />

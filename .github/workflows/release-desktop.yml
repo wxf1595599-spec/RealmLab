@@ -1,23 +1,20 @@
 name: Release desktop
 
-# Desktop (Wails) release line. Tag namespace `desktop-v<semver>` triggers this —
-# plain `v<semver>` tags are the CLI release (release.yml) and intentionally do NOT
-# trigger here (GitHub glob `v*` does not match `desktop-v*`). Bump with:
-#   git tag desktop-vX.Y.Z && git push origin desktop-vX.Y.Z
+# RealmLab desktop release line. Tag namespace `realmlab-v<semver>` is the single
+# app/update version source. Bump with:
+#   git tag realmlab-vX.Y.Z && git push github-new realmlab-vX.Y.Z
 #
 # Wails cannot cross-compile a CGO/WebKit binary, so build/ fans out to one native
 # runner per platform. Artifacts are minisign-signed (MINISIGN_* secrets), a
 # latest.json manifest is generated, and everything is published to a GitHub
-# release and mirrored to R2 (the updater reads R2 first, GitHub as fallback).
+# release. The running updater reads that GitHub release manifest directly.
 #
-# The same build/sign/manifest pipeline serves two channels. A `desktop-v*` tag
-# (or manual stable dispatch) publishes a GitHub release and moves R2's latest/
-# pointer. A manual `channel: canary` dispatch builds with -X main.channel=canary
-# and uploads only to R2's canary/ pointer — no GitHub release, so canary never
-# shows on the releases page and never touches latest/.
+# The same build/sign/manifest pipeline serves two channels. A `realmlab-v*` tag
+# (or manual stable dispatch) publishes a GitHub release. A manual canary dispatch
+# updates the rolling `realmlab-canary` prerelease tag.
 on:
   push:
-    tags: ["desktop-v*"]
+    tags: ["realmlab-v*"]
   workflow_dispatch:
     inputs:
       channel:
@@ -26,11 +23,11 @@ on:
         options: [stable, canary]
         default: stable
       tag:
-        description: "stable: tag to publish (e.g. desktop-v1.1.0)"
+        description: "stable: tag to publish (e.g. realmlab-v1.0.2)"
         required: false
         type: string
       base_version:
-        description: "canary: intended next stable version, e.g. 1.5.0"
+        description: "canary: intended next stable version, e.g. 1.0.3"
         required: false
         type: string
 
@@ -193,7 +190,7 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: DeepSeek-Reasonix
+          project-slug: RealmLab
           signing-policy-slug: ${{ steps.ver.outputs.channel == 'canary' && 'test-signing' || 'release-signing' }}
           artifact-configuration-slug: windows-installer
           github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
@@ -225,8 +222,8 @@ jobs:
     name: publish release
     needs: build
     runs-on: ubuntu-latest
-    # Stable publishes go through the `release` environment (esengine must
-    # approve); canary uses the open `canary` environment so maintainers self-serve.
+    # Stable publishes go through the `release` environment; canary uses the open
+    # `canary` environment so maintainers self-serve.
     environment: ${{ (github.event_name == 'workflow_dispatch' && inputs.channel == 'canary') && 'canary' || 'release' }}
     steps:
       - uses: actions/checkout@v7
@@ -254,122 +251,20 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           RUN_NUMBER: ${{ github.run_number }}
 
-      # Generate latest.json with GitHub release download URLs; the mirror step
-      # rewrites them to R2 afterwards. GITHUB_REPOSITORY is provided by the runner.
+      # Generate latest.json with GitHub release download URLs. GITHUB_REPOSITORY
+      # is provided by the runner and points at this RealmLab repository.
       - name: Generate manifest
         working-directory: desktop
         run: go run ./cmd/sign manifest ../dist "${{ steps.ver.outputs.version }}" "${{ steps.ver.outputs.tag }}"
 
-      # Canary is R2-only and never appears on the GitHub releases page; the mirror
-      # job picks up the signed dist via the canary-dist artifact below. Stable
-      # publishes a GitHub release as usual.
       - name: Publish GitHub release
-        if: steps.ver.outputs.channel != 'canary'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           args=(--title "RealmLab Desktop ${{ steps.ver.outputs.version }}" --generate-notes)
           [ "${{ steps.ver.outputs.prerelease }}" = "true" ] && args+=(--prerelease)
-          gh release create "${{ steps.ver.outputs.tag }}" dist/* "${args[@]}"
-
-      - name: Upload canary dist for mirror
-        if: steps.ver.outputs.channel == 'canary'
-        uses: actions/upload-artifact@v7
-        with:
-          name: canary-dist
-          path: dist/*
-          if-no-files-found: error
-
-  mirror:
-    name: mirror to R2
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read # gh release download
-      actions: write # dispatch pages.yml to re-bake the site version
-    # Skip cleanly when R2 isn't configured; GitHub release still works as fallback.
-    if: ${{ github.repository_owner == 'esengine' }}
-    env:
-      HAS_R2: ${{ secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_ACCOUNT_ID != '' && secrets.R2_BUCKET != '' }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Resolve version
-        id: ver
-        run: bash scripts/resolve-desktop-release.sh
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          IN_CHANNEL: ${{ inputs.channel }}
-          IN_TAG: ${{ inputs.tag }}
-          IN_BASE_VERSION: ${{ inputs.base_version }}
-          REF_NAME: ${{ github.ref_name }}
-          RUN_NUMBER: ${{ github.run_number }}
-
-      # Canary has no GitHub release — pull the signed dist from the workflow
-      # artifact. Stable pulls from the published release.
-      - name: Download canary dist
-        if: env.HAS_R2 == 'true' && steps.ver.outputs.channel == 'canary'
-        uses: actions/download-artifact@v8
-        with:
-          name: canary-dist
-          path: assets
-
-      - name: Download release assets
-        if: env.HAS_R2 == 'true' && steps.ver.outputs.channel != 'canary'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p assets
-          gh release download "${{ steps.ver.outputs.tag }}" -R "${{ github.repository }}" -D assets
-
-      # Rewrite both url and sig inside latest.json from github.com to the R2 CDN,
-      # so the updater pulls the manifest AND the heavy artifacts from R2.
-      - name: Rewrite latest.json URLs to R2
-        if: env.HAS_R2 == 'true'
-        env:
-          R2_PUBLIC_BASE: https://dl.reasonix.io
-          TAG: ${{ steps.ver.outputs.tag }}
-        run: |
-          f=assets/latest.json
-          jq --arg base "$R2_PUBLIC_BASE" --arg tag "$TAG" '
-            .platforms |= with_entries(
-              .value.url |= sub("https://github.com/[^/]+/[^/]+/releases/download/[^/]+/"; "\($base)/\($tag)/")
-              | .value.sig |= sub("https://github.com/[^/]+/[^/]+/releases/download/[^/]+/"; "\($base)/\($tag)/")
-            )
-          ' "$f" > "$f.new"
-          mv "$f.new" "$f"
-          cat "$f"
-
-      - name: Configure AWS CLI for R2
-        if: env.HAS_R2 == 'true'
-        run: |
-          aws configure set aws_access_key_id "${{ secrets.R2_ACCESS_KEY_ID }}"
-          aws configure set aws_secret_access_key "${{ secrets.R2_SECRET_ACCESS_KEY }}"
-          aws configure set region auto
-
-      - name: Mirror to R2
-        if: env.HAS_R2 == 'true'
-        env:
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          TAG: ${{ steps.ver.outputs.tag }}
-        run: |
-          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          aws s3 cp assets/ "s3://${R2_BUCKET}/${TAG}/" --recursive --endpoint-url "$ENDPOINT"
-          # The pointer a release moves is its channel's alone: canary writes
-          # canary/, stable writes latest/. A stable prerelease (rc) moves neither.
-          if [ "${{ steps.ver.outputs.channel }}" = "canary" ]; then
-            aws s3 cp assets/ "s3://${R2_BUCKET}/canary/" --recursive --endpoint-url "$ENDPOINT"
-          elif [ "${{ steps.ver.outputs.prerelease }}" = "true" ]; then
-            echo "prerelease — leaving R2 latest/ untouched"
+          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            gh release upload "${{ steps.ver.outputs.tag }}" dist/* --clobber
           else
-            aws s3 cp assets/ "s3://${R2_BUCKET}/latest/" --recursive --endpoint-url "$ENDPOINT"
+            gh release create "${{ steps.ver.outputs.tag }}" dist/* "${args[@]}"
           fi
-
-      # Stable release moved R2 latest/ — rebuild the site so its build-time baked
-      # version + JSON-LD follow (site.js's runtime .rxv refresh can't touch first paint / SEO).
-      - name: Refresh site to the new version
-        if: env.HAS_R2 == 'true' && steps.ver.outputs.channel != 'canary' && steps.ver.outputs.prerelease != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages.yml --ref main-v2

@@ -123,6 +123,9 @@ ok(/@container \(max-width: 430px\)[^@]*\.context-panel__usage-grid/s.test(style
 ok(!/:\s*"[^"\n]*(?:Reasonix|DeepSeek-Reasonix|Yolo|YOLO)[^"\n]*"/.test(localeSources), "locale values avoid user-visible Reasonix/Yolo wording");
 excludes(localeSources, "./reasonix.toml", "locale values avoid exposing the legacy project config filename");
 ok(/:\s*"[^"\n]*Soha[^"\n]*"/.test(localeSources), "locale values keep Soha as the visible approval label");
+ok(/"composer\.placeholder":\s*"给 MicroRealm Lab 发消息…"/.test(localeSources), "Chinese composer placeholder stays concise");
+ok(/"composer\.ariaLabel":\s*"[^"]*斜杠打开命令[^"]*@ 引用文件[^"]*终端命令/.test(localeSources), "composer aria label keeps shortcut affordances out of the placeholder");
+ok(!/"composer\.placeholder":\s*"[^"]*\([^"]*(?:命令|commands|檔案)/.test(localeSources), "composer placeholder avoids inline shortcut instructions");
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

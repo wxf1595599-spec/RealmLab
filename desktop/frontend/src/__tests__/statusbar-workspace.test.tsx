@@ -53,9 +53,68 @@ console.log("\nstatus bar workspace");
     gitBranch: "feature/meta",
   };
   const html = renderStatusBar(propsWithLegacySandbox);
-  ok(html.includes("workspace/repo"), "workspace chip uses workspace path");
+  ok(html.includes("<b>repo</b>"), "workspace chip prefers the clean workspace name");
+  ok(html.includes("/workspace/repo"), "workspace chip preserves the full path for hover and accessibility");
   ok(!html.includes("sandbox/repo"), "workspace chip does not display sandbox path");
   ok(html.includes("feature/meta"), "git branch remains visible");
+}
+
+{
+  const html = renderStatusBar({
+    items: ["model", "workspace", "cache", "context", "session_tokens", "balance"],
+    context: { used: 42, window: 100, sessionTokens: 3200 },
+    usage: {
+      promptTokens: 1000,
+      completionTokens: 220,
+      totalTokens: 1220,
+      cacheHitTokens: 840,
+      cacheMissTokens: 160,
+      sessionCacheHitTokens: 2200,
+      sessionCacheMissTokens: 800,
+    },
+    sessionTokens: 3200,
+    balance: { available: true, display: "¥25.21" },
+    workspacePath: "/workspace/repo",
+    workspaceName: "repo",
+    modelLabel: "deepseek-v4-pro",
+  });
+  ok(html.includes("statusbar__group--environment"), "status bar renders the environment section");
+  ok(html.includes("statusbar__group--health"), "status bar renders the session health section");
+  ok(html.includes("statusbar__group--usage"), "status bar renders the usage and balance section");
+  ok(html.indexOf("deepseek-v4-pro") < html.indexOf("<b>repo</b>"), "environment section keeps configured item scan order");
+}
+
+{
+  const html = renderStatusBar({
+    items: ["context", "session_tokens", "cost", "balance"],
+    context: { used: 42, window: 100, sessionTokens: 3200 },
+    sessionTokens: 3200,
+    cost: 0.0923,
+    currency: "CNY",
+    balance: { available: true, display: "¥25.21" },
+    toolApprovalMode: "auto",
+  });
+  ok(html.includes("statusbar__group--modes"), "auto approval status renders as a mode indicator");
+  ok(
+    html.indexOf("statusbar__group--modes") < html.indexOf("statusbar__group--usage"),
+    "usage metrics remain the rightmost group when a mode indicator is visible",
+  );
+}
+
+{
+  const html = renderStatusBar({
+    items: ["context", "session_tokens", "cost", "balance"],
+    context: { used: 42, window: 100, sessionTokens: 3200 },
+    sessionTokens: 3200,
+    cost: 0.0923,
+    currency: "CNY",
+    balance: { available: true, display: "¥25.21" },
+    toolApprovalMode: "yolo",
+  });
+  ok(
+    html.indexOf("statusbar__group--modes") < html.indexOf("statusbar__group--usage"),
+    "usage metrics remain the rightmost group when Soha is visible",
+  );
 }
 
 {
@@ -67,6 +126,7 @@ console.log("\nstatus bar workspace");
   });
   ok(!html.includes("workspace/repo"), "workspace can be hidden by status item config");
   ok(!html.includes("feature/meta"), "git branch can be hidden by status item config");
+  ok(!html.includes("statusbar__cache"), "empty single-turn cache metric stays hidden");
 }
 
 {
@@ -76,8 +136,8 @@ console.log("\nstatus bar workspace");
     workspaceName: "repo",
     gitBranch: "feature/meta",
   });
-  ok(html.indexOf("feature/meta") >= 0 && html.indexOf("workspace/repo") >= 0, "workspace and git branch render as configured items");
-  ok(html.indexOf("feature/meta") < html.indexOf("workspace/repo"), "workspace items follow configured order");
+  ok(html.indexOf("feature/meta") >= 0 && html.indexOf("<b>repo</b>") >= 0, "workspace and git branch render as configured items");
+  ok(html.indexOf("feature/meta") < html.indexOf("<b>repo</b>"), "workspace items follow configured order");
 }
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
